@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-25T08:05:23Z",
+  "title": "Design System: Annotarama",
+  "extensions": {
+    "typographyMeta": {
+      "display": {
+        "displayName": "Outfit Display",
+        "purpose": "Large page headings, only where layout supports the scale."
+      },
+      "headline": {
+        "displayName": "Outfit Headline",
+        "purpose": "Section-level emphasis."
+      },
+      "body": {
+        "displayName": "Outfit Body",
+        "purpose": "Default interface and reading text."
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button (provisional)",
+      "kind": "button",
+      "description": "High-priority action, using Loopr Indigo.",
+      "html": "<button class=\"ds-primary-button\">Continue</button>",
+      "css": ".ds-primary-button { background: var(--color-primary); color: var(--color-surface); border: 0; border-radius: 16px; padding: 12px 20px; font: 600 16px var(--font-sans); cursor: pointer; transition: background 160ms ease, transform 160ms ease; } .ds-primary-button:hover { background: var(--color-primary-hover); } .ds-primary-button:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; } .ds-primary-button:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Secondary Button (provisional)",
+      "kind": "button",
+      "description": "Lower-priority action, using the deep navy palette.",
+      "html": "<button class=\"ds-secondary-button\">Cancel</button>",
+      "css": ".ds-secondary-button { background: var(--color-surface); color: var(--color-secondary); border: 1px solid var(--color-border); border-radius: 16px; padding: 12px 20px; font: 600 16px var(--font-sans); cursor: pointer; transition: background 160ms ease; } .ds-secondary-button:hover { background: var(--color-primary-light); } .ds-secondary-button:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input (provisional)",
+      "kind": "input",
+      "description": "Neutral text field with an accent focus indicator.",
+      "html": "<input class=\"ds-text-input\" aria-label=\"Search\" placeholder=\"Search\">",
+      "css": ".ds-text-input { width: 100%; background: var(--color-surface); color: var(--color-ink); border: 1px solid var(--color-border); border-radius: 16px; padding: 12px 14px; font: 400 16px var(--font-sans); } .ds-text-input:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; border-color: var(--color-primary); } .ds-text-input::placeholder { color: var(--color-secondary); opacity: 0.7; }"
+    },
+    {
+      "name": "Card (provisional)",
+      "kind": "card",
+      "description": "Neutral content grouping; no shadow convention established yet.",
+      "html": "<section class=\"ds-card\"><strong>Card title</strong><p>Supporting content</p></section>",
+      "css": ".ds-card { background: var(--color-surface); color: var(--color-ink); border: 1px solid var(--color-border); border-radius: 16px; padding: 20px; font-family: var(--font-sans); } .ds-card p { margin-bottom: 0; color: var(--color-secondary); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Loopr AI — confident clarity for a modern product.",
+    "overview": "Loopr AI is the user-selected visual north star. Preserve the observed blue-led palette and Outfit typography while keeping the interface crisp, legible, and focused on the work. This is a visual reference, not a request to copy Loopr's page layouts or product content. The app is still a TanStack starter; component patterns remain provisional until the product UI exists.",
+    "keyCharacteristics": [
+      "Loopr-inspired, blue-led identity.",
+      "Outfit typography with restrained neutral surfaces.",
+      "Clear semantic color roles; reuse tokens instead of raw values."
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Color Rule",
+        "body": "Use primary, secondary, accent, and surface tokens by role; do not scatter literal color values through components.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Use existing Tailwind utilities such as bg-primary, text-secondary, and font-sans.",
+      "Keep text and interactive states legible against their surfaces.",
+      "Preserve Loopr AI as visual inspiration without copying page composition or content."
+    ],
+    "donts": [
+      "Hard-code palette values in components when a theme utility exists.",
+      "Present provisional component or radius choices as established project conventions.",
+      "Add a competing font or accent palette without a clear product need."
+    ]
+  }
+}

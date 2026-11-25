@@ -1,0 +1,50 @@
+{
+  "name": "annotarama",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "generate-routes": "vite build",
+    "build": "vite build",
+    "build:inspection": "node scripts/build-inspection.mjs && biome format --write src/components/inspection-part.ts",
+    "preview": "vite preview",
+    "format": "biome format --write",
+    "lint": "biome lint",
+    "check": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "react:doctor": "react-doctor --verbose --no-score",
+    "knip": "knip",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.46",
+    "@tanstack/react-start": "1.169.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.5",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "husky": "^9.1.7",
+    "knip": "^6.32.3",
+    "lint-staged": "^17.3.0",
+    "react-doctor": "^0.9.23",
+    "react-scan": "^0.5.7",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,css,md}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
+  }
+}
