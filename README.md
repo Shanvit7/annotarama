@@ -6,7 +6,7 @@
 
 Annotarama is a React app for capturing images with a device camera, assessing image quality, and creating editable, labeled bounding-box annotations. The target experience is responsive across desktop, tablet, and mobile. See [`docs/OBJECTIVES.md`](docs/OBJECTIVES.md) for product objectives and requirements, and [`DESIGN.md`](DESIGN.md) for the Loopr AI-inspired visual system.
 
-> **Status:** project scaffold is in place; camera capture, image quality assessment, and annotation workflows are not implemented yet.
+> **Status:** camera capture, advisory live-preview quality checks, camera switching, and bounding-box annotation editing are implemented. Annotation data stays in memory; captured-image quality assessment and persistence are not implemented. See [live camera quality notes](docs/live-camera-quality.md) for thresholds, checks, and device-testing limits.
 
 ## Stack
 
@@ -28,19 +28,24 @@ Open <http://localhost:3000>.
 ## Quality checks
 
 ```bash
+pnpm run test
 pnpm check
 pnpm typecheck
 pnpm knip
 pnpm build
 ```
 
-Husky runs Biome on staged files before commit. GitHub Actions runs all four quality checks on pushes and pull requests to `main`.
+Husky runs Biome on staged files before commit. GitHub Actions runs tests and all four quality checks on pushes and pull requests to `main`.
 
-## Planned workflow
+## GitHub Pages
+
+After enabling **Settings → Pages → GitHub Actions** in the repository, pushes to `main` deploy the pre-rendered app. GitHub Pages' repository base path is applied to assets and client-side routes.
+
+## Current workflow
 
 1. Request camera access and show a live preview.
-2. Capture, review, or retake an image; expose torch control only when supported.
-3. Show actual resolution and file size with clear quality feedback.
+2. Switch between available cameras; expose torch control only when supported.
+3. Capture, review, or retake an image; show resolution, file size, and advisory live quality.
 4. Draw, select, move, resize, label, and delete bounding boxes.
 5. Keep annotations aligned as the displayed image resizes; support touch and keyboard interaction.
 
@@ -60,4 +65,4 @@ Husky runs Biome on staged files before commit. GitHub Actions runs all four qua
 
 ## Known limitations
 
-Camera, torch, quality thresholds, annotation editing, feature tests, persistence, and demo deployment remain to be built. Camera and torch capabilities vary by browser and device; unsupported features must be detected and explained in the UI.
+Live quality thresholds are experimental and need physical-device calibration. Camera and torch capabilities vary by browser and device; unsupported features are detected in the UI. Quality estimates describe the live preview, not the captured still. Annotation data is in memory only and is cleared on retake or leaving capture. Persistence and demo deployment are not implemented.

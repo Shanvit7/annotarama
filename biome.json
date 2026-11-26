@@ -11,6 +11,8 @@
 			"**/src/**/*",
 			"**/.vscode/**/*",
 			"**/index.html",
+			"!**/dist",
+			"!**/.impeccable",
 			"**/vite.config.ts",
 			"!**/src/routeTree.gen.ts",
 			"!**/src/styles.css"
@@ -24,9 +26,25 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+			"style": {
+				"useFilenamingConvention": {
+					"level": "error",
+					"options": { "filenameCases": ["kebab-case"] }
+				}
+			}
 		}
 	},
+	"overrides": [
+		{
+			"includes": ["src/routes/__root.tsx"],
+			"linter": {
+				"rules": {
+					"style": { "useFilenamingConvention": "off" }
+				}
+			}
+		}
+	],
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"

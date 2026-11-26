@@ -24,10 +24,10 @@ The app is intended for desktop, tablet, and mobile use. Manufacturing-floor wor
 
 ## Capabilities and Constraints
 
-- Planned: live camera preview, capture/preview/retake, practical maximum resolution, quality feedback, and torch control where supported.
-- Planned: draw, select, move, resize, label, and delete rectangular annotations; keep marks aligned when the image is resized.
-- These product features are not implemented yet; do not present them as working capabilities.
-- The app is open to use without authentication. Persistence and export are undecided.
+- Implemented: live camera preview, capture/preview/retake, switching between available cameras, practical maximum resolution, quality feedback, and torch control where supported.
+- Implemented: draw, select, move, resize, label, and delete rectangular annotations; marks stay aligned when image display size changes.
+- Annotation data is in-memory only. Retaking or leaving capture clears annotations; persistence and export are not implemented.
+- The app is open to use without authentication.
 - Landing-page copy must be plain and useful, with no invented product claims.
 
 ## Brand Commitments

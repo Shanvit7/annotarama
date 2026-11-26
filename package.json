@@ -15,14 +15,19 @@
     "format": "biome format --write",
     "lint": "biome lint",
     "check": "biome check .",
+    "test": "node --test src/hooks/use-camera.test.mjs src/lib/image-quality.test.mjs",
     "typecheck": "tsc --noEmit",
     "react:doctor": "react-doctor --verbose --no-score",
     "knip": "knip",
     "prepare": "husky"
   },
   "dependencies": {
+    "@annotorious/react": "^3.10.0",
     "@tanstack/react-router": "1.170.46",
     "@tanstack/react-start": "1.169.7",
+    "@yusufceng1z/ding-react": "^0.0.4",
+    "lucide-react": "^0.475.0",
+    "radix-ui": "^1.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

@@ -16,6 +16,7 @@ Annotarama helps people capture images with a device camera and annotate them in
 - Request camera access and show a live preview.
 - Capture at the highest practical resolution supported by the device and browser.
 - Let users capture, preview, and retake images.
+- Let users switch between available cameras when device has multiple video inputs.
 - Handle denied permissions and unsupported devices with clear recovery guidance.
 - Offer torch control on supported mobile devices; keep the UI in sync with actual torch state and omit or explain unsupported controls.
 

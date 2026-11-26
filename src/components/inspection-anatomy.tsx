@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { inspectionPart } from "./inspection-part";
+import { inspectionPart } from "@/components/inspection-part";
 
 export const InspectionAnatomy = () => {
 	const id = useId();

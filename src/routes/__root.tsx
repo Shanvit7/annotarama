@@ -1,6 +1,8 @@
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Toaster } from "@yusufceng1z/ding-react";
+import { APP_FAVICON_URL, APP_IS_DEVELOPMENT } from "@/lib/constants";
 
-import appCss from "../styles.css?url";
+import appCss from "@/styles.css?url";
 
 export const Route = createRootRoute({
 	head: () => ({
@@ -20,7 +22,7 @@ export const Route = createRootRoute({
 			{
 				rel: "icon",
 				type: "image/svg+xml",
-				href: "/favicon.svg",
+				href: APP_FAVICON_URL,
 			},
 			{
 				rel: "stylesheet",
@@ -35,14 +37,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="en">
 			<head>
-				{import.meta.env.DEV && (
+				{APP_IS_DEVELOPMENT && (
 					<script type="module" src="/src/react-scan.ts" />
 				)}
 				<HeadContent />
 			</head>
 			<body>
 				{children}
-
+				<Toaster position="top-center" theme="light" />
 				<Scripts />
 			</body>
 		</html>

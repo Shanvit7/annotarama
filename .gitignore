@@ -3,6 +3,7 @@ node_modules
 .claude/
 .pi/
 .DS_Store
+.cta.json
 dist
 dist-ssr
 *.local
