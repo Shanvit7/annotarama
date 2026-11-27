@@ -11,7 +11,7 @@ const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export type PhotoDraftStatus = "saving" | "saved" | "error";
 
-export type PhotoDraft = CapturedPhoto & {
+type PhotoDraft = CapturedPhoto & {
 	id: string;
 	qualityAtCapture: LiveQuality;
 	annotations: ImageAnnotation[];
