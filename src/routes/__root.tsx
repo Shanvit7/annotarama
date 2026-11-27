@@ -1,6 +1,11 @@
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Toaster } from "@yusufceng1z/ding-react";
+import { useEffect } from "react";
 import { APP_FAVICON_URL, APP_IS_DEVELOPMENT } from "@/lib/constants";
+import {
+	getOrCreatePhotoSessionId,
+	startPhotoDraftCleanup,
+} from "@/lib/photo-drafts";
 
 import appCss from "@/styles.css?url";
 
@@ -33,6 +38,14 @@ export const Route = createRootRoute({
 	shellComponent: RootDocument,
 });
 
+const PhotoDraftCleanup = () => {
+	useEffect(() => {
+		getOrCreatePhotoSessionId();
+		return startPhotoDraftCleanup();
+	}, []);
+	return null;
+};
+
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="en">
@@ -43,6 +56,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<HeadContent />
 			</head>
 			<body>
+				<PhotoDraftCleanup />
 				{children}
 				<Toaster position="top-center" theme="light" />
 				<Scripts />

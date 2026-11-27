@@ -1,5 +1,6 @@
 import { Dialog as SheetPrimitive } from "radix-ui";
 import type * as React from "react";
+import { cn } from "@/lib/utils";
 
 const Sheet = (props: React.ComponentProps<typeof SheetPrimitive.Root>) => (
 	<SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -27,7 +28,10 @@ const SheetContent = ({
 	<SheetPrimitive.Portal container={portalContainer ?? undefined}>
 		<SheetPrimitive.Content
 			data-slot="sheet-content"
-			className={`absolute inset-y-0 right-0 z-50 flex h-full w-[min(24rem,85vw)] flex-col border-l border-border bg-surface text-secondary shadow-xl outline-none data-[state=open]:animate-[annotation-sheet-enter_200ms_ease-in-out_both] data-[state=closed]:animate-[annotation-sheet-exit_200ms_ease-in-out_both] ${className ?? ""}`}
+			className={cn(
+				"absolute inset-y-0 right-0 z-50 flex h-full w-[min(24rem,85vw)] flex-col border-l border-border bg-surface text-secondary shadow-xl outline-none data-[state=open]:animate-[annotation-sheet-enter_200ms_ease-in-out_both] data-[state=closed]:animate-[annotation-sheet-exit_200ms_ease-in-out_both]",
+				className,
+			)}
 			{...props}
 		/>
 	</SheetPrimitive.Portal>
@@ -39,7 +43,7 @@ const SheetTitle = ({
 }: React.ComponentProps<typeof SheetPrimitive.Title>) => (
 	<SheetPrimitive.Title
 		data-slot="sheet-title"
-		className={`font-semibold text-secondary ${className ?? ""}`}
+		className={cn("font-semibold text-secondary", className)}
 		{...props}
 	/>
 );
