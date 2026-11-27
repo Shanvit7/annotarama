@@ -19,21 +19,20 @@
     "typecheck": "tsc --noEmit",
     "react:doctor": "react-doctor --verbose --no-score",
     "knip": "knip",
-    "prepare": "husky"
+    "prepare": "husky",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@annotorious/react": "^3.10.0",
     "@tanstack/react-router": "1.170.46",
     "@tanstack/react-start": "1.169.7",
     "@yusufceng1z/ding-react": "^0.0.4",
-    "clsx": "^2.1.1",
     "dexie": "^4.4.7",
     "lucide-react": "^0.475.0",
     "radix-ui": "^1.8.1",
     "react": "^19.2.0",
     "react-call": "^2.0.2",
-    "react-dom": "^19.2.0",
-    "tailwind-merge": "^3.7.1"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
