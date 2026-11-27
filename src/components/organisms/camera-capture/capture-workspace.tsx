@@ -18,7 +18,7 @@ const formatFileSize = (bytes: number) => {
 	return `${(bytes / unitSize).toFixed(1)} ${unit}`;
 };
 
-export type CaptureWorkspaceProps = {
+type CaptureWorkspaceProps = {
 	camera: ReturnType<typeof useCamera>;
 	isLive: boolean;
 	isCaptured: boolean;
