@@ -41,8 +41,6 @@ type CaptureWorkspaceProps = {
 	isPhotoSaving: boolean;
 	draftStatus: "saving" | "saved" | "error";
 	setDraftStatus: (status: "saving" | "saved" | "error") => void;
-	annotationSheetContainer: HTMLElement | null;
-	setAnnotationSheetContainer: (container: HTMLElement | null) => void;
 	onCapture: () => void;
 	onRetake: () => void;
 };
@@ -102,7 +100,9 @@ const CapturedPhotoPreview = ({
 	isPhotoSaving,
 	draftStatus,
 	setDraftStatus,
-	annotationSheetContainer,
+	qualityAtCapture,
+	liveQuality,
+	onRetake,
 }: Pick<
 	CaptureWorkspaceProps,
 	| "isCaptured"
@@ -112,7 +112,9 @@ const CapturedPhotoPreview = ({
 	| "isPhotoSaving"
 	| "draftStatus"
 	| "setDraftStatus"
-	| "annotationSheetContainer"
+	| "qualityAtCapture"
+	| "liveQuality"
+	| "onRetake"
 > & {
 	photo: ReturnType<typeof useCamera>["photo"];
 }) => {
@@ -124,7 +126,7 @@ const CapturedPhotoPreview = ({
 			</p>
 		);
 	}
-	if (photoUrl && annotationSheetContainer && photo) {
+	if (photoUrl && photo) {
 		return (
 			<ImageAnnotationEditor
 				imageUrl={photoUrl}
@@ -134,7 +136,15 @@ const CapturedPhotoPreview = ({
 				initialAnnotations={initialAnnotations}
 				draftStatus={draftStatus}
 				setDraftStatus={setDraftStatus}
-				annotationSheetContainer={annotationSheetContainer}
+				photoDetails={
+					<CapturedPhotoSummary
+						quality={qualityAtCapture ?? liveQuality}
+						onRetake={onRetake}
+						width={photo.width}
+						height={photo.height}
+						fileSize={formatFileSize(photo.blob.size)}
+					/>
+				}
 			/>
 		);
 	}
@@ -150,7 +160,7 @@ const getPreviewFrameClass = (
 	isCaptured: boolean,
 	liveBorderClass: string,
 ) =>
-	`relative overflow-hidden rounded-2xl text-center ${isLive ? `h-full w-auto max-w-full aspect-video flex-none border-2 ${liveBorderClass} min-h-40` : "flex min-h-0 flex-1 flex-col"} ${isCaptured ? "bg-surface" : isLive ? "bg-transparent text-surface" : "bg-secondary text-surface"}`;
+	`relative overflow-hidden text-center ${isLive ? `h-full w-full max-w-full flex-1 border-2 ${liveBorderClass} min-h-40 xl:aspect-video xl:w-auto xl:flex-none xl:rounded-2xl` : "flex min-h-0 flex-1 flex-col"} ${isCaptured ? "bg-surface" : isLive ? "bg-transparent text-surface" : "bg-secondary text-surface xl:rounded-2xl"}`;
 
 const CapturePreviewFrame = ({
 	camera,
@@ -164,7 +174,8 @@ const CapturePreviewFrame = ({
 	isPhotoSaving,
 	draftStatus,
 	setDraftStatus,
-	annotationSheetContainer,
+	qualityAtCapture,
+	onRetake,
 	onCapture,
 }: CaptureWorkspaceProps) => {
 	const { photo, videoRef } = camera;
@@ -198,7 +209,9 @@ const CapturePreviewFrame = ({
 				isPhotoSaving={isPhotoSaving}
 				draftStatus={draftStatus}
 				setDraftStatus={setDraftStatus}
-				annotationSheetContainer={annotationSheetContainer}
+				qualityAtCapture={qualityAtCapture}
+				liveQuality={liveQuality}
+				onRetake={onRetake}
 			/>
 			<CameraPreviewControls
 				status={camera.status}
@@ -216,40 +229,19 @@ const CapturePreviewFrame = ({
 };
 
 const CaptureWorkspace = (props: CaptureWorkspaceProps) => {
-	const {
-		camera,
-		isLive,
-		isCaptured,
-		liveQuality,
-		qualityAtCapture,
-		setAnnotationSheetContainer,
-		onRetake,
-	} = props;
-	const { photo } = camera;
+	const { isLive, isCaptured } = props;
 
 	return (
 		<section
-			ref={setAnnotationSheetContainer}
 			aria-label={isCaptured ? "Annotate photo" : "Capture an image"}
-			className={`relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden ${isCaptured ? "rounded-xl border border-border/50 bg-surface p-3" : isLive ? "rounded-2xl bg-transparent" : "rounded-2xl bg-secondary"}`}
+			className={`relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden ${isCaptured ? "bg-surface" : isLive ? "bg-transparent xl:rounded-2xl" : "bg-secondary xl:rounded-2xl"}`}
 		>
 			<div
 				data-capture-workspace
-				className={`relative min-h-0 min-w-0 ${isCaptured ? "grid flex-1 grid-rows-[minmax(0,1fr)_auto] gap-2 lg:grid-cols-[15rem_minmax(0,1fr)] lg:grid-rows-1 [@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[12rem_minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-1" : "flex min-h-0 flex-col"}`}
+				className="relative flex min-h-0 min-w-0 flex-col"
 			>
-				{isCaptured && photo && (
-					<div className="order-last min-w-0 lg:order-first">
-						<CapturedPhotoSummary
-							quality={qualityAtCapture ?? liveQuality}
-							onRetake={onRetake}
-							width={photo.width}
-							height={photo.height}
-							fileSize={formatFileSize(photo.blob.size)}
-						/>
-					</div>
-				)}
 				<div
-					className={`flex min-h-0 flex-1 ${isLive ? "justify-center" : ""} ${isCaptured ? "order-first min-w-0 lg:order-last" : ""}`}
+					className={`flex min-h-0 min-w-0 flex-1 ${isLive ? "justify-center" : ""}`}
 				>
 					<CapturePreviewFrame {...props} />
 				</div>
@@ -257,6 +249,97 @@ const CaptureWorkspace = (props: CaptureWorkspaceProps) => {
 		</section>
 	);
 };
+
+type CaptureMainProps = CaptureWorkspaceProps & { isRestoring: boolean };
+
+type CaptureHeaderProps = {
+	isCaptured: boolean;
+	isLive: boolean;
+	isRestoring: boolean;
+};
+
+const CaptureHeader = ({
+	isCaptured,
+	isLive,
+	isRestoring,
+}: CaptureHeaderProps) => (
+	<header
+		className={`mx-auto hidden w-full items-center justify-between xl:flex ${isCaptured || isRestoring ? "h-14 border-b border-border/60 px-3 sm:px-5" : isLive ? "max-w-none" : "max-w-5xl"}`}
+	>
+		<div className="inline-flex items-center gap-2.5">
+			<Link
+				to="/"
+				aria-label="Back to Annotarama"
+				className="grid size-12 place-items-center rounded-xl"
+			>
+				<img src={APP_FAVICON_URL} alt="" width="36" height="36" />
+			</Link>
+			<h1 className="m-0 text-medium font-semibold tracking-[-0.03em] text-secondary">
+				{isRestoring
+					? "Restoring photo…"
+					: isCaptured
+						? "Annotate"
+						: isLive
+							? "Capture"
+							: "Get Ready"}
+			</h1>
+		</div>
+	</header>
+);
+
+const PhotoRestorePlaceholder = () => (
+	<output
+		aria-label="Restoring your photo"
+		className="grid min-h-0 flex-1 grid-rows-[max(17rem,40dvh)_auto] overflow-y-auto rounded-2xl bg-surface text-secondary md:grid-cols-[minmax(0,1fr)_20rem] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden [@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[minmax(0,1fr)_17rem] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-[minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-hidden"
+	>
+		<section
+			aria-hidden="true"
+			className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-surface-muted"
+		>
+			<div className="flex min-h-11 items-center justify-between border-b border-border/60 bg-surface px-4">
+				<span className="h-6 w-24 animate-pulse rounded-md bg-primary-light motion-reduce:animate-none" />
+				<span className="h-3 w-28 animate-pulse rounded bg-primary-light motion-reduce:animate-none" />
+			</div>
+			<div className="grid min-h-0 place-items-center p-3 sm:p-6">
+				<div className="aspect-[4/3] max-h-full w-full max-w-3xl animate-pulse rounded-md bg-secondary/10 motion-reduce:animate-none" />
+			</div>
+			<div className="flex min-h-11 items-center justify-between border-t border-border/60 bg-surface px-4">
+				<span className="h-3 w-20 animate-pulse rounded bg-primary-light motion-reduce:animate-none" />
+				<span className="h-9 w-24 animate-pulse rounded-md bg-primary-light motion-reduce:animate-none" />
+			</div>
+		</section>
+		<aside
+			aria-hidden="true"
+			className="flex min-h-0 flex-col border-t border-border/60 bg-surface md:border-l md:border-t-0"
+		>
+			<div className="space-y-3 border-b border-border/60 p-4">
+				<div className="h-4 w-28 animate-pulse rounded bg-primary-light motion-reduce:animate-none" />
+				<div className="h-3 w-36 animate-pulse rounded bg-primary-light motion-reduce:animate-none" />
+				<div className="h-3 w-24 animate-pulse rounded bg-primary-light motion-reduce:animate-none" />
+			</div>
+			<div className="flex-1 space-y-4 p-4">
+				<div className="flex items-center justify-between">
+					<div className="h-4 w-24 animate-pulse rounded bg-primary-light motion-reduce:animate-none" />
+					<div className="size-5 animate-pulse rounded bg-primary-light motion-reduce:animate-none" />
+				</div>
+				<div className="h-3 w-32 animate-pulse rounded bg-primary-light motion-reduce:animate-none" />
+			</div>
+		</aside>
+		<p className="sr-only">Restoring your photo…</p>
+	</output>
+);
+
+const CaptureMain = ({ isRestoring, ...workspace }: CaptureMainProps) => (
+	<main
+		className={`mx-auto grid min-h-0 w-full min-w-0 ${workspace.isCaptured || workspace.isLive || isRestoring ? "max-w-none" : "max-w-none xl:max-w-5xl"}`}
+	>
+		{isRestoring ? (
+			<PhotoRestorePlaceholder />
+		) : (
+			<CaptureWorkspace {...workspace} />
+		)}
+	</main>
+);
 
 const CameraCapture = () => {
 	const camera = useCamera();
@@ -277,9 +360,8 @@ const CameraCapture = () => {
 		"saved",
 	);
 	const [isPhotoSaving, setIsPhotoSaving] = useState(false);
+	const [isRestoring, setIsRestoring] = useState(true);
 	const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-	const [annotationSheetContainer, setAnnotationSheetContainer] =
-		useState<HTMLElement | null>(null);
 	const [qualityAtCapture, setQualityAtCapture] = useState<LiveQuality | null>(
 		null,
 	);
@@ -333,6 +415,7 @@ const CameraCapture = () => {
 		setDraftId(id);
 		if (!id) {
 			setDraftStatus("error");
+			setIsRestoring(false);
 			return () => {
 				ignore = true;
 			};
@@ -351,11 +434,13 @@ const CameraCapture = () => {
 					});
 				}
 				setDraftStatus("saved");
+				setIsRestoring(false);
 			},
 			(restoreError: unknown) => {
 				if (ignore) return;
 				logger.error("Could not restore this tab's photo data", restoreError);
 				setDraftStatus("error");
+				setIsRestoring(false);
 			},
 		);
 
@@ -379,47 +464,31 @@ const CameraCapture = () => {
 
 	return (
 		<div
-			className={`grid h-dvh grid-rows-[auto_minmax(0,1fr)] bg-primary-light ${isCaptured ? "gap-2 p-3 sm:p-4" : "gap-4 p-4 sm:gap-5 sm:p-6"}`}
+			className={`grid h-dvh grid-rows-[minmax(0,1fr)] xl:grid-rows-[auto_minmax(0,1fr)] ${isCaptured || isRestoring ? "bg-surface" : "bg-primary-light xl:gap-5 xl:p-6"}`}
 		>
-			<header
-				className={`mx-auto flex w-full items-center justify-between ${isCaptured ? "max-w-7xl" : isLive ? "max-w-none" : "max-w-5xl"}`}
-			>
-				<div className="inline-flex items-center gap-2.5">
-					<Link
-						to="/"
-						aria-label="Back to Annotarama"
-						className="grid size-12 place-items-center rounded-xl"
-					>
-						<img src={APP_FAVICON_URL} alt="" width="36" height="36" />
-					</Link>
-					<h1 className="m-0 text-medium font-semibold tracking-[-0.03em] text-secondary">
-						{isCaptured ? "Annotate" : isLive ? "Capture" : "Get Ready"}
-					</h1>
-				</div>
-			</header>
+			<CaptureHeader
+				isCaptured={isCaptured}
+				isLive={isLive}
+				isRestoring={isRestoring}
+			/>
 
-			<main
-				className={`mx-auto grid min-h-0 w-full min-w-0 ${isCaptured ? "max-w-7xl" : isLive ? "max-w-none" : "max-w-5xl"}`}
-			>
-				<CaptureWorkspace
-					camera={camera}
-					isLive={isLive}
-					isCaptured={isCaptured}
-					liveQuality={liveQuality}
-					qualityAtCapture={qualityAtCapture}
-					liveBorderClass={liveBorderClass}
-					photoUrl={photoUrl}
-					draftId={draftId}
-					initialAnnotations={initialAnnotations}
-					isPhotoSaving={isPhotoSaving}
-					draftStatus={draftStatus}
-					setDraftStatus={setDraftStatus}
-					annotationSheetContainer={annotationSheetContainer}
-					setAnnotationSheetContainer={setAnnotationSheetContainer}
-					onCapture={handleCapture}
-					onRetake={handleRetake}
-				/>
-			</main>
+			<CaptureMain
+				isRestoring={isRestoring}
+				camera={camera}
+				isLive={isLive}
+				isCaptured={isCaptured}
+				liveQuality={liveQuality}
+				qualityAtCapture={qualityAtCapture}
+				liveBorderClass={liveBorderClass}
+				photoUrl={photoUrl}
+				draftId={draftId}
+				initialAnnotations={initialAnnotations}
+				isPhotoSaving={isPhotoSaving}
+				draftStatus={draftStatus}
+				setDraftStatus={setDraftStatus}
+				onCapture={handleCapture}
+				onRetake={handleRetake}
+			/>
 		</div>
 	);
 };

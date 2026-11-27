@@ -1,6 +1,7 @@
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Toaster } from "@yusufceng1z/ding-react";
 import { useEffect } from "react";
+import { AnnotationDeleteConfirmation } from "@/components/molecules/annotation-delete-confirmation";
 import { APP_FAVICON_URL, APP_IS_DEVELOPMENT } from "@/lib/constants";
 import {
 	getOrCreatePhotoSessionId,
@@ -58,6 +59,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			<body>
 				<PhotoDraftCleanup />
 				{children}
+				<AnnotationDeleteConfirmation />
 				<Toaster position="top-center" theme="light" />
 				<Scripts />
 			</body>
