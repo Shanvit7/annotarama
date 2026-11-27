@@ -186,15 +186,15 @@ export const CapturedPhotoSummary = ({
 	return (
 		<section
 			aria-labelledby="captured-photo-summary-heading"
-			className="min-w-0 shrink-0 rounded-xl border border-border/60 bg-primary-light/30 p-3"
+			className="min-w-0 shrink-0 border-b border-border/60 p-4"
 		>
 			<h2
 				id="captured-photo-summary-heading"
-				className="m-0 text-small font-semibold text-secondary"
+				className="m-0 text-sm font-semibold text-secondary"
 			>
 				Photo details
 			</h2>
-			<dl className="m-0 mt-3 grid grid-cols-3 gap-x-3 gap-y-3 md:grid-cols-2">
+			<dl className="m-0 mt-3 grid grid-cols-3 gap-x-3 gap-y-3">
 				{metrics.map(({ label, value, status }) => (
 					<div key={label} className="min-w-0">
 						<dt className="text-tiny leading-4 text-neutral-dark">{label}</dt>

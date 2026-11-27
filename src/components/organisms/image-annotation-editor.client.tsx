@@ -12,18 +12,24 @@ import type {
 	ImageAnnotation,
 	PopupProps,
 } from "@annotorious/react";
-import { ArrowUp, PanelRightOpen, ScanSearch, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+	ArrowUp,
+	Minus,
+	Plus,
+	ScanSearch,
+	SquareDashedMousePointer,
+	Trash2,
+	X,
+} from "lucide-react";
+import {
+	type ReactNode,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { AnnotationDeleteConfirmation } from "@/components/molecules/annotation-delete-confirmation";
-import {
-	Sheet,
-	SheetClose,
-	SheetContent,
-	SheetDescription,
-	SheetTitle,
-	SheetTrigger,
-} from "@/components/ui/sheet";
 import { logger } from "@/lib/logger";
 import type { PhotoDraftStatus } from "@/lib/photo-drafts";
 import { savePhotoAnnotations } from "@/lib/photo-drafts";
@@ -48,10 +54,10 @@ const AnnotationLabelForm = ({
 			?.focus({ preventScroll: true });
 	};
 	const deleteAnnotation = async () => {
-		const confirmed = await AnnotationDeleteConfirmation.call({
-			label: body?.value,
-		});
-		if (!confirmed) return;
+		if (body?.value?.trim()) {
+			const confirmed = await AnnotationDeleteConfirmation.call({});
+			if (!confirmed) return;
+		}
 
 		const current = document.querySelector<HTMLButtonElement>(
 			`[data-annotation-id="${CSS.escape(annotation.id)}"]`,
@@ -68,7 +74,7 @@ const AnnotationLabelForm = ({
 
 		annotator?.removeAnnotation(annotation.id);
 		annotator?.setSelected();
-		requestAnimationFrame(() => target?.focus({ preventScroll: true }));
+		window.setTimeout(() => target?.focus({ preventScroll: true }), 0);
 	};
 
 	useEffect(() => {
@@ -170,41 +176,29 @@ const AnnotationList = ({ draftStatus }: { draftStatus: PhotoDraftStatus }) => {
 	const selectedId = selected[0]?.annotation.id;
 
 	return (
-		<aside
+		<section
 			aria-label="Annotations"
-			className="flex h-full min-h-0 flex-col overflow-hidden bg-surface text-left"
+			className="flex min-h-48 flex-col overflow-hidden bg-surface text-left md:min-h-0 md:flex-1 [@media(max-height:34rem)_and_(min-width:40rem)]:min-h-48 [@media(max-height:34rem)_and_(min-width:40rem)]:flex-none"
 		>
-			<div className="flex h-12 shrink-0 items-center gap-3 border-b border-border/60 px-4">
+			<div className="flex h-12 shrink-0 items-center gap-2.5 px-4">
 				<ScanSearch aria-hidden="true" className="size-4 text-primary" />
-				<SheetTitle
+				<h2
 					data-annotations-heading
 					tabIndex={-1}
-					className="m-0 flex-1 text-base font-semibold focus-visible:outline-2 focus-visible:outline-accent"
+					className="m-0 flex-1 text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-accent"
 				>
 					Annotations
-				</SheetTitle>
-				<SheetDescription className="sr-only">
-					Review and edit annotations for this photo.
-				</SheetDescription>
+				</h2>
 				<output
 					aria-label={`${annotations.length} ${annotations.length === 1 ? "annotation" : "annotations"}`}
-					className="rounded-full bg-primary-light px-2.5 py-1 text-small font-semibold tabular-nums text-primary"
+					className="rounded bg-primary-light px-2 py-0.5 text-xs font-semibold tabular-nums text-primary"
 				>
 					{annotations.length}
 				</output>
-				<SheetClose asChild>
-					<button
-						type="button"
-						aria-label="Hide annotations"
-						className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg text-neutral-dark transition-colors hover:bg-primary-light hover:text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-					>
-						<X aria-hidden="true" className="size-4" />
-					</button>
-				</SheetClose>
 			</div>
 			<p
 				aria-live="polite"
-				className={`m-0 px-3 pt-2 text-tiny ${draftStatus === "error" ? "text-error" : "text-neutral-dark"}`}
+				className={`m-0 px-4 pb-3 text-tiny ${draftStatus === "error" ? "text-error" : "text-neutral-dark"}`}
 			>
 				{draftStatus === "saving"
 					? "Saving changes…"
@@ -213,11 +207,20 @@ const AnnotationList = ({ draftStatus }: { draftStatus: PhotoDraftStatus }) => {
 						: "Changes saved on this tab."}
 			</p>
 			{annotations.length === 0 ? (
-				<p className="m-0 px-3 py-4 text-sm leading-5 text-neutral-dark">
-					Draw a box, then add a label.
-				</p>
+				<div className="flex flex-col items-center gap-2 px-6 py-6 text-center">
+					<SquareDashedMousePointer
+						aria-hidden="true"
+						className="size-6 text-neutral-dark"
+					/>
+					<p className="m-0 text-sm font-medium text-secondary">
+						No annotations yet
+					</p>
+					<p className="m-0 max-w-52 text-xs leading-5 text-neutral-dark">
+						Drag on the photo to draw a box, then add a label.
+					</p>
+				</div>
 			) : (
-				<ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain p-2">
+				<ul className="m-0 max-h-72 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain px-2 pb-2 md:max-h-none [@media(max-height:34rem)_and_(min-width:40rem)]:max-h-48">
 					{annotations.map((annotation, index) => {
 						const label = annotation.bodies
 							.find((body) => body.purpose === "commenting")
@@ -249,10 +252,12 @@ const AnnotationList = ({ draftStatus }: { draftStatus: PhotoDraftStatus }) => {
 								<button
 									type="button"
 									onClick={async () => {
-										const confirmed = await AnnotationDeleteConfirmation.call({
-											label,
-										});
-										if (!confirmed) return;
+										if (label) {
+											const confirmed = await AnnotationDeleteConfirmation.call(
+												{},
+											);
+											if (!confirmed) return;
+										}
 
 										const row = document
 											.querySelector<HTMLButtonElement>(
@@ -285,7 +290,7 @@ const AnnotationList = ({ draftStatus }: { draftStatus: PhotoDraftStatus }) => {
 					})}
 				</ul>
 			)}
-		</aside>
+		</section>
 	);
 };
 
@@ -297,7 +302,7 @@ type ImageAnnotationEditorProps = {
 	initialAnnotations: ImageAnnotation[];
 	draftStatus: PhotoDraftStatus;
 	setDraftStatus: (status: PhotoDraftStatus) => void;
-	annotationSheetContainer: HTMLElement;
+	photoDetails: ReactNode;
 };
 
 type AnnotationNumberMarkersProps = Pick<
@@ -334,46 +339,6 @@ const AnnotationNumberMarkers = ({
 	);
 };
 
-const AnnotationSidebar = ({
-	annotationSheetContainer,
-	draftStatus,
-}: Pick<
-	ImageAnnotationEditorProps,
-	"annotationSheetContainer" | "draftStatus"
->) => {
-	const annotations = useAnnotations();
-
-	return (
-		<Sheet modal={false} defaultOpen>
-			{createPortal(
-				<SheetTrigger asChild>
-					<button
-						type="button"
-						aria-label={`Open annotations drawer (${annotations.length})`}
-						className="absolute right-4 top-4 z-10 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-surface shadow-md transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-					>
-						<PanelRightOpen aria-hidden="true" className="size-4" />
-						<span>Open annotations</span>
-						<span
-							aria-hidden="true"
-							className="rounded-full bg-surface/20 px-2 py-0.5 text-tiny tabular-nums"
-						>
-							{annotations.length}
-						</span>
-					</button>
-				</SheetTrigger>,
-				annotationSheetContainer,
-			)}
-			<SheetContent
-				portalContainer={annotationSheetContainer}
-				className="h-full overflow-hidden p-0 [@media(max-height:34rem)_and_(min-width:40rem)]:!w-72"
-			>
-				<AnnotationList draftStatus={draftStatus} />
-			</SheetContent>
-		</Sheet>
-	);
-};
-
 const AnnotationDraftSync = ({
 	draftId,
 	initialAnnotations,
@@ -387,6 +352,7 @@ const AnnotationDraftSync = ({
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
+		if (!annotator) return;
 		annotator.setAnnotations(initialAnnotations, true);
 
 		const save = () => {
@@ -430,59 +396,164 @@ const ImageAnnotationEditor = ({
 	initialAnnotations,
 	draftStatus,
 	setDraftStatus,
-	annotationSheetContainer,
+	photoDetails,
 }: ImageAnnotationEditorProps) => {
+	const [zoom, setZoom] = useState(1);
+	const [fitWidth, setFitWidth] = useState<number | null>(null);
+	const photoScrollerRef = useRef<HTMLDivElement>(null);
+
+	useLayoutEffect(() => {
+		const frame = photoScrollerRef.current?.parentElement;
+		if (!frame) return;
+
+		const observer = new ResizeObserver(([entry]) => {
+			setFitWidth(
+				Math.min(
+					entry.contentRect.width,
+					(entry.contentRect.height * imageWidth) / imageHeight,
+				),
+			);
+		});
+		observer.observe(frame);
+		return () => observer.disconnect();
+	}, [imageWidth, imageHeight]);
+
+	useLayoutEffect(() => {
+		const scroller = photoScrollerRef.current;
+		const photo = scroller?.firstElementChild;
+		if (!scroller || !photo || fitWidth === null) return;
+		const bounds = photo.getBoundingClientRect();
+		const scaledWidth = fitWidth * zoom;
+		const scaledHeight = (scaledWidth * imageHeight) / imageWidth;
+		scroller.scrollLeft =
+			scaledWidth > scroller.clientWidth
+				? (bounds.width - scroller.clientWidth) / 2
+				: 0;
+		scroller.scrollTop =
+			scaledHeight > scroller.clientHeight
+				? (bounds.height - scroller.clientHeight) / 2
+				: 0;
+	}, [fitWidth, imageHeight, imageWidth, zoom]);
+
+	const photoWidth =
+		fitWidth === null
+			? `min(100cqw, ${(imageWidth / imageHeight) * 100}cqh)`
+			: fitWidth * zoom;
+
 	return (
 		<Annotorious>
-			<AnnotationDeleteConfirmation />
-			<div className="relative min-h-0 min-w-0 flex-1">
-				<div className="flex size-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg [container-type:size]">
-					<div
-						className="relative lg:translate-x-[-7.75rem] lg:max-w-[calc(100cqw_-_15rem)] [@media(max-height:34rem)_and_(min-width:40rem)]:translate-x-[-6.25rem] [@media(max-height:34rem)_and_(min-width:40rem)]:max-w-[calc(100cqw_-_12rem)]"
-						style={{
-							width: `min(100cqw, ${(imageWidth / imageHeight) * 100}cqh)`,
-							aspectRatio: `${imageWidth} / ${imageHeight}`,
-						}}
-					>
-						<ImageAnnotator
-							containerClassName="relative size-full [&_.a9s-inner]:fill-primary/5! [&_.a9s-inner]:stroke-primary! [&_.a9s-outer]:hidden! [&_.a9s-inner]:[stroke-width:1px]! [&_.a9s-handle-dot]:stroke-primary!"
-							drawingMode="drag"
-							tool="rectangle"
-						>
-							<img
-								src={imageUrl}
-								width={imageWidth}
-								height={imageHeight}
-								alt="Captured scene. Draw boxes to mark areas needing attention."
-								className="block size-full"
-							/>
-						</ImageAnnotator>
-						<AnnotationNumberMarkers
-							imageWidth={imageWidth}
-							imageHeight={imageHeight}
-						/>
+			<div className="grid min-h-0 min-w-0 flex-1 grid-rows-[max(17rem,40dvh)_auto] overflow-y-auto md:grid-cols-[minmax(0,1fr)_20rem] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden [@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[minmax(0,1fr)_17rem] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-[minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-hidden">
+				<section
+					aria-label="Photo canvas"
+					className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-surface-muted"
+				>
+					<div className="flex min-h-11 items-center justify-between gap-3 border-b border-border/60 bg-surface px-3 sm:px-4">
+						<span className="inline-flex items-center gap-2 rounded-md bg-primary-light px-2.5 py-1.5 text-xs font-medium text-primary">
+							<SquareDashedMousePointer aria-hidden="true" className="size-4" />
+							Rectangle
+						</span>
+						<p className="m-0 text-xs text-neutral-dark">
+							Drag to mark an area
+						</p>
 					</div>
-					{draftId && (
-						<AnnotationDraftSync
-							draftId={draftId}
-							initialAnnotations={initialAnnotations}
-							setDraftStatus={setDraftStatus}
-						/>
-					)}
-				</div>
-				<AnnotationSidebar
-					annotationSheetContainer={annotationSheetContainer}
-					draftStatus={draftStatus}
-				/>
+					<div className="min-h-0 min-w-0 p-3 sm:p-6 [@media(max-height:34rem)_and_(min-width:40rem)]:p-3">
+						<div
+							ref={photoScrollerRef}
+							className="flex size-full min-h-0 min-w-0 overflow-auto [container-type:size]"
+						>
+							<div
+								className="relative m-auto shrink-0 shadow-sm"
+								style={{
+									width: photoWidth,
+									aspectRatio: `${imageWidth} / ${imageHeight}`,
+								}}
+							>
+								<ImageAnnotator
+									containerClassName="relative size-full [&_.a9s-inner]:fill-primary/5! [&_.a9s-inner]:stroke-primary! [&_.a9s-outer]:hidden! [&_.a9s-inner]:[stroke-width:1px]! [&_.a9s-handle-dot]:stroke-primary!"
+									drawingMode="drag"
+									tool="rectangle"
+								>
+									<img
+										src={imageUrl}
+										width={imageWidth}
+										height={imageHeight}
+										alt="Captured scene. Draw boxes to mark areas needing attention."
+										className="block size-full"
+									/>
+								</ImageAnnotator>
+								<AnnotationNumberMarkers
+									imageWidth={imageWidth}
+									imageHeight={imageHeight}
+								/>
+							</div>
+						</div>
+					</div>
+					<div className="flex min-h-11 items-center justify-between gap-2 border-t border-border/60 bg-surface px-3 text-xs tabular-nums text-neutral-dark sm:px-4">
+						<span className="shrink-0">
+							{imageWidth} × {imageHeight}
+						</span>
+						<fieldset className="m-0 inline-flex shrink-0 items-center gap-1 border-0 p-0">
+							<legend className="sr-only">Photo zoom</legend>
+							<button
+								type="button"
+								aria-label="Zoom out"
+								title="Zoom out"
+								disabled={zoom <= 0.25}
+								onClick={() =>
+									setZoom((current) => Math.max(0.25, current - 0.25))
+								}
+								className="inline-flex size-10 items-center justify-center rounded-md text-neutral-dark hover:bg-surface-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+							>
+								<Minus aria-hidden="true" className="size-4" />
+							</button>
+							<button
+								type="button"
+								aria-label="Fit photo to view"
+								title="Reset zoom to Fit; percentage is relative to Fit"
+								onClick={() => setZoom(1)}
+								className="min-h-10 rounded-md px-2 text-xs font-medium text-neutral-dark hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+							>
+								{Math.round(zoom * 100)}%
+							</button>
+							<button
+								type="button"
+								aria-label="Zoom in"
+								title="Zoom in"
+								disabled={zoom >= 4}
+								onClick={() =>
+									setZoom((current) => Math.min(4, current + 0.25))
+								}
+								className="inline-flex size-10 items-center justify-center rounded-md text-neutral-dark hover:bg-surface-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+							>
+								<Plus aria-hidden="true" className="size-4" />
+							</button>
+						</fieldset>
+					</div>
+				</section>
+				<aside
+					aria-label="Photo inspector"
+					className="flex min-w-0 flex-col border-t border-border/60 bg-surface text-left md:min-h-0 md:overflow-hidden md:border-l md:border-t-0 [@media(max-height:34rem)_and_(min-width:40rem)]:min-h-0 [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-y-auto [@media(max-height:34rem)_and_(min-width:40rem)]:border-l [@media(max-height:34rem)_and_(min-width:40rem)]:border-t-0"
+				>
+					{photoDetails}
+					<AnnotationList draftStatus={draftStatus} />
+				</aside>
 			</div>
-			{createPortal(
-				<ImageAnnotationPopup
-					popup={(props) => (
-						<AnnotationLabelForm key={props.annotation.id} {...props} />
-					)}
-				/>,
-				annotationSheetContainer.ownerDocument.body,
+			{draftId && (
+				<AnnotationDraftSync
+					draftId={draftId}
+					initialAnnotations={initialAnnotations}
+					setDraftStatus={setDraftStatus}
+				/>
 			)}
+			{typeof document !== "undefined" &&
+				createPortal(
+					<ImageAnnotationPopup
+						popup={(props) => (
+							<AnnotationLabelForm key={props.annotation.id} {...props} />
+						)}
+					/>,
+					document.body,
+				)}
 		</Annotorious>
 	);
 };

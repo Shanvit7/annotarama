@@ -1,6 +1,6 @@
 import type { ImageAnnotation } from "@annotorious/react";
 import { ClientOnly } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
+import { lazy, type ReactNode, Suspense } from "react";
 import type { PhotoDraftStatus } from "@/lib/photo-drafts";
 
 type ImageAnnotationEditorProps = {
@@ -11,11 +11,11 @@ type ImageAnnotationEditorProps = {
 	initialAnnotations: ImageAnnotation[];
 	draftStatus: PhotoDraftStatus;
 	setDraftStatus: (status: PhotoDraftStatus) => void;
-	annotationSheetContainer: HTMLElement;
+	photoDetails: ReactNode;
 };
 
 const ClientImageAnnotationEditor = lazy(
-	() => import("./image-annotation-editor.client"),
+	() => import("@/components/organisms/image-annotation-editor.client"),
 );
 
 export const ImageAnnotationEditor = (props: ImageAnnotationEditorProps) => (
