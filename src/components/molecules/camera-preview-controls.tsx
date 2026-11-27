@@ -50,7 +50,7 @@ const CameraStartPrompt = ({ status, onStart }: CameraStartPromptProps) => (
 			type="button"
 			disabled={status === "requesting"}
 			onClick={onStart}
-			className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-6 font-mono font-semibold text-surface hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-70"
+			className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-surface px-6 font-mono font-semibold text-primary shadow-sm transition-colors hover:bg-primary-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-70"
 		>
 			<Camera aria-hidden="true" className="size-5" />
 			{status === "requesting"
