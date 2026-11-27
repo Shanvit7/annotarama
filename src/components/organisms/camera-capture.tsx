@@ -160,7 +160,7 @@ const getPreviewFrameClass = (
 	isCaptured: boolean,
 	liveBorderClass: string,
 ) =>
-	`relative overflow-hidden text-center ${isLive ? `h-full w-auto max-w-full aspect-video flex-none rounded-2xl border-2 ${liveBorderClass} min-h-40` : "flex min-h-0 flex-1 flex-col"} ${isCaptured ? "bg-surface" : isLive ? "bg-transparent text-surface" : "rounded-2xl bg-secondary text-surface"}`;
+	`relative overflow-hidden text-center ${isLive ? `h-full w-full max-w-full flex-1 border-2 ${liveBorderClass} min-h-40 xl:aspect-video xl:w-auto xl:flex-none xl:rounded-2xl` : "flex min-h-0 flex-1 flex-col"} ${isCaptured ? "bg-surface" : isLive ? "bg-transparent text-surface" : "bg-secondary text-surface xl:rounded-2xl"}`;
 
 const CapturePreviewFrame = ({
 	camera,
@@ -234,7 +234,7 @@ const CaptureWorkspace = (props: CaptureWorkspaceProps) => {
 	return (
 		<section
 			aria-label={isCaptured ? "Annotate photo" : "Capture an image"}
-			className={`relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden ${isCaptured ? "bg-surface" : isLive ? "rounded-2xl bg-transparent" : "rounded-2xl bg-secondary"}`}
+			className={`relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden ${isCaptured ? "bg-surface" : isLive ? "bg-transparent xl:rounded-2xl" : "bg-secondary xl:rounded-2xl"}`}
 		>
 			<div
 				data-capture-workspace
@@ -264,7 +264,7 @@ const CaptureHeader = ({
 	isRestoring,
 }: CaptureHeaderProps) => (
 	<header
-		className={`mx-auto flex w-full items-center justify-between ${isCaptured || isRestoring ? "h-14 border-b border-border/60 px-3 sm:px-5" : isLive ? "max-w-none" : "max-w-5xl"}`}
+		className={`mx-auto hidden w-full items-center justify-between xl:flex ${isCaptured || isRestoring ? "h-14 border-b border-border/60 px-3 sm:px-5" : isLive ? "max-w-none" : "max-w-5xl"}`}
 	>
 		<div className="inline-flex items-center gap-2.5">
 			<Link
@@ -331,7 +331,7 @@ const PhotoRestorePlaceholder = () => (
 
 const CaptureMain = ({ isRestoring, ...workspace }: CaptureMainProps) => (
 	<main
-		className={`mx-auto grid min-h-0 w-full min-w-0 ${workspace.isCaptured || workspace.isLive || isRestoring ? "max-w-none" : "max-w-5xl"}`}
+		className={`mx-auto grid min-h-0 w-full min-w-0 ${workspace.isCaptured || workspace.isLive || isRestoring ? "max-w-none" : "max-w-none xl:max-w-5xl"}`}
 	>
 		{isRestoring ? (
 			<PhotoRestorePlaceholder />
@@ -464,7 +464,7 @@ const CameraCapture = () => {
 
 	return (
 		<div
-			className={`grid h-dvh grid-rows-[auto_minmax(0,1fr)] ${isCaptured || isRestoring ? "bg-surface" : "gap-4 bg-primary-light p-4 sm:gap-5 sm:p-6"}`}
+			className={`grid h-dvh grid-rows-[minmax(0,1fr)] xl:grid-rows-[auto_minmax(0,1fr)] ${isCaptured || isRestoring ? "bg-surface" : "bg-primary-light xl:gap-5 xl:p-6"}`}
 		>
 			<CaptureHeader
 				isCaptured={isCaptured}

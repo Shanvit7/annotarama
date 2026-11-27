@@ -459,7 +459,7 @@ const ImageAnnotationEditor = ({
 					<div className="min-h-0 min-w-0 p-3 sm:p-6 [@media(max-height:34rem)_and_(min-width:40rem)]:p-3">
 						<div
 							ref={photoScrollerRef}
-							className="flex size-full min-h-0 min-w-0 overflow-auto [container-type:size]"
+							className={`flex size-full min-h-0 min-w-0 ${zoom > 1 ? "overflow-auto" : "overflow-hidden"} [container-type:size]`}
 						>
 							<div
 								className="relative m-auto shrink-0 shadow-sm"

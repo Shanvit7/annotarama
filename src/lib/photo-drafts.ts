@@ -102,13 +102,11 @@ export const savePhotoDraft = async (
 	photo: CapturedPhoto,
 	qualityAtCapture: LiveQuality,
 ) => {
-	const current = await database.drafts.get(id);
 	await database.drafts.put({
-		...current,
 		...photo,
 		id,
 		qualityAtCapture,
-		annotations: current?.annotations ?? [],
+		annotations: [],
 		updatedAt: Date.now(),
 	});
 };
