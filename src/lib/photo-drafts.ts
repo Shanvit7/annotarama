@@ -11,8 +11,11 @@ const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export type PhotoDraftStatus = "saving" | "saved" | "error";
 
+export type PhotoDraftStage = "review" | "annotating";
+
 type PhotoDraft = CapturedPhoto & {
 	id: string;
+	stage: PhotoDraftStage;
 	qualityAtCapture: LiveQuality;
 	annotations: ImageAnnotation[];
 	updatedAt: number;
@@ -105,10 +108,22 @@ export const savePhotoDraft = async (
 	await database.drafts.put({
 		...photo,
 		id,
+		stage: "review",
 		qualityAtCapture,
 		annotations: [],
 		updatedAt: Date.now(),
 	});
+};
+
+export const setPhotoDraftStage = async (
+	id: string,
+	stage: PhotoDraftStage,
+) => {
+	const updated = await database.drafts.update(id, {
+		stage,
+		updatedAt: Date.now(),
+	});
+	if (updated === 0) throw new Error("Photo draft does not exist");
 };
 
 export const savePhotoAnnotations = async (

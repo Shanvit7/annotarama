@@ -44,6 +44,116 @@ const stopTracks = (stream: MediaStream) => {
 	});
 };
 
+export const getMaxResolution = (
+	capabilities: MediaTrackCapabilities | undefined,
+): { width: number; height: number } | null => {
+	const width = capabilities?.width?.max ?? 0;
+	const height = capabilities?.height?.max ?? 0;
+	return width > 0 && height > 0 ? { width, height } : null;
+};
+
+const readTrackMaxResolution = (track: MediaStreamTrack) => {
+	try {
+		return getMaxResolution(track.getCapabilities?.());
+	} catch (capabilityError) {
+		logger.warn("Could not read camera capabilities", capabilityError);
+		return null;
+	}
+};
+
+// Camera streams default to a preview-friendly size, so ask for the sensor maximum before capturing.
+const applyMaxResolution = async (track: MediaStreamTrack) => {
+	const max = readTrackMaxResolution(track);
+	if (!max) return;
+
+	try {
+		await track.applyConstraints({
+			width: { ideal: max.width },
+			height: { ideal: max.height },
+		});
+	} catch (constraintError) {
+		logger.warn("Could not raise capture resolution", constraintError);
+	}
+};
+
+type PhotoCapabilities = {
+	imageWidth?: { max?: number };
+	imageHeight?: { max?: number };
+};
+
+type ImageCaptureLike = {
+	getPhotoCapabilities?: () => Promise<PhotoCapabilities>;
+	takePhoto: (options?: {
+		imageWidth?: number;
+		imageHeight?: number;
+	}) => Promise<Blob>;
+};
+
+// ImageCapture gives full-sensor stills; browsers without it fall back to a video frame.
+const takeNativePhoto = async (track: MediaStreamTrack) => {
+	const ImageCaptureCtor = (
+		globalThis as {
+			ImageCapture?: new (track: MediaStreamTrack) => ImageCaptureLike;
+		}
+	).ImageCapture;
+	if (!ImageCaptureCtor) return null;
+
+	try {
+		const capture = new ImageCaptureCtor(track);
+		const capabilities = await capture.getPhotoCapabilities?.();
+		const max = readTrackMaxResolution(track);
+		const imageWidth = capabilities?.imageWidth?.max || max?.width;
+		const imageHeight = capabilities?.imageHeight?.max || max?.height;
+		const blob = await capture.takePhoto(
+			imageWidth && imageHeight ? { imageWidth, imageHeight } : undefined,
+		);
+		return blob.size > 0 ? blob : null;
+	} catch (nativeError) {
+		logger.warn("Native photo capture unavailable", nativeError);
+		return null;
+	}
+};
+
+const captureVideoFrame = async (
+	video: HTMLVideoElement,
+	width: number,
+	height: number,
+) => {
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	const context = canvas.getContext("2d");
+	if (!context) throw new Error("Canvas is unavailable");
+	context.drawImage(video, 0, 0, width, height);
+
+	return await new Promise<Blob>((resolve, reject) => {
+		canvas.toBlob(
+			(result) => {
+				if (result) resolve(result);
+				else reject(new Error("Photo encoding failed"));
+			},
+			"image/jpeg",
+			0.92,
+		);
+	});
+};
+
+// Report the blob's real dimensions so the UI never claims a resolution the file does not have.
+const readPhotoSize = async (
+	blob: Blob,
+	fallback: { width: number; height: number },
+) => {
+	try {
+		const bitmap = await createImageBitmap(blob);
+		const size = { width: bitmap.width, height: bitmap.height };
+		bitmap.close();
+		return size;
+	} catch (bitmapError) {
+		logger.warn("Could not read photo dimensions", bitmapError);
+		return fallback;
+	}
+};
+
 export const mapCameraError = (error: unknown): CameraError => {
 	const name = error instanceof Error ? error.name : "";
 
@@ -218,6 +328,13 @@ export const useCamera = () => {
 				return;
 			}
 
+			await applyMaxResolution(track);
+
+			if (requestId !== requestIdRef.current) {
+				stopTracks(stream);
+				return;
+			}
+
 			const settings = track.getSettings?.();
 			const width = settings?.width ?? video.videoWidth;
 			const height = settings?.height ?? video.videoHeight;
@@ -274,10 +391,11 @@ export const useCamera = () => {
 
 	const capturePhoto = useCallback(async () => {
 		const video = videoRef.current;
-		const width = video?.videoWidth ?? 0;
-		const height = video?.videoHeight ?? 0;
+		const track = streamRef.current?.getVideoTracks()[0] ?? null;
+		const frameWidth = video?.videoWidth ?? 0;
+		const frameHeight = video?.videoHeight ?? 0;
 
-		if (!video || width === 0 || height === 0 || !streamRef.current) {
+		if (!video || !track || frameWidth === 0 || frameHeight === 0) {
 			setError(
 				createCameraError(
 					"capture-not-ready",
@@ -288,24 +406,14 @@ export const useCamera = () => {
 		}
 
 		setStatus("capturing");
-		const canvas = document.createElement("canvas");
-		canvas.width = width;
-		canvas.height = height;
 
 		try {
-			const context = canvas.getContext("2d");
-			if (!context) throw new Error("Canvas is unavailable");
-			context.drawImage(video, 0, 0, width, height);
-
-			const blob = await new Promise<Blob>((resolve, reject) => {
-				canvas.toBlob(
-					(result) => {
-						if (result) resolve(result);
-						else reject(new Error("Photo encoding failed"));
-					},
-					"image/jpeg",
-					0.92,
-				);
+			const blob =
+				(await takeNativePhoto(track)) ??
+				(await captureVideoFrame(video, frameWidth, frameHeight));
+			const { width, height } = await readPhotoSize(blob, {
+				width: frameWidth,
+				height: frameHeight,
 			});
 
 			const capturedPhoto = { blob, width, height };

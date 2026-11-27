@@ -169,6 +169,9 @@ importers:
       '@annotorious/react':
         specifier: ^3.10.0
         version: 3.10.0(openseadragon@6.1.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@betterlytics/tracker':
+        specifier: ^0.2.3
+        version: 0.2.3
       '@tanstack/react-router':
         specifier: 1.170.46
         version: 1.170.46(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -178,6 +181,9 @@ importers:
       '@yusufceng1z/ding-react':
         specifier: ^0.0.4
         version: 0.0.4(react@19.3.1)
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       dexie:
         specifier: ^4.4.7
         version: 4.4.7
@@ -332,6 +338,10 @@ packages:
   '@babel/types@7.29.15':
     resolution: {integrity: sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ==}
     engines: {node: '>=6.9.0'}
+
+  '@betterlytics/tracker@0.2.3':
+    resolution: {integrity: sha512-hD7ziTT8pEi6VwTDPzzG6Xt7NhPCrERviBOupooQ4de7L3wArH53o9HQn9wASPHKNFgL95prNPwswCYRJqVo9Q==}
+    engines: {node: '>=14.0.0'}
 
   '@biomejs/biome@2.4.5':
     resolution: {integrity: sha512-OWNCyMS0Q011R6YifXNOg6qsOg64IVc7XX6SqGsrGszPbkVCoaO7Sr/lISFnXZ9hjQhDewwZ40789QmrG0GYgQ==}
@@ -2523,6 +2533,10 @@ packages:
     resolution: {integrity: sha512-bXfOC4QcT1tKXGorxL3wbJm6XJPDqEnij2gQ2m7ESQuE+/z9YFIWnl/5RpTiKWbMq3EVKR4fRLJGn6DVfu0mpw==}
     engines: {node: '>=18.20'}
 
+  clsx@2.1.1:
+    resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
+    engines: {node: '>=6'}
+
   commander@14.0.3:
     resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
     engines: {node: '>=20'}
@@ -3758,6 +3772,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.15
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@betterlytics/tracker@0.2.3': {}
 
   '@biomejs/biome@2.4.5':
     optionalDependencies:
@@ -5770,6 +5786,8 @@ snapshots:
       restore-cursor: 5.1.0
 
   cli-spinners@3.4.0: {}
+
+  clsx@2.1.1: {}
 
   commander@14.0.3: {}
 

@@ -2,6 +2,7 @@ import {
 	Annotorious,
 	ImageAnnotationPopup,
 	ImageAnnotator,
+	ShapeType,
 	useAnnotations,
 	useAnnotator,
 	useSelection,
@@ -11,11 +12,13 @@ import type {
 	Annotator,
 	ImageAnnotation,
 	PopupProps,
+	RectangleGeometry,
 } from "@annotorious/react";
 import {
 	ArrowUp,
-	Minus,
-	Plus,
+	ChevronDown,
+	ChevronUp,
+	Move,
 	ScanSearch,
 	SquareDashedMousePointer,
 	Trash2,
@@ -30,6 +33,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AnnotationDeleteConfirmation } from "@/components/molecules/annotation-delete-confirmation";
+import { PhotoZoomControls } from "@/components/molecules/photo-zoom-controls";
+import { SegmentedToggle } from "@/components/molecules/segmented-toggle";
+import { adjustRectangleForKey } from "@/lib/annotation-keyboard";
 import { logger } from "@/lib/logger";
 import type { PhotoDraftStatus } from "@/lib/photo-drafts";
 import { savePhotoAnnotations } from "@/lib/photo-drafts";
@@ -169,11 +175,53 @@ const AnnotationLabelForm = ({
 	);
 };
 
-const AnnotationList = ({ draftStatus }: { draftStatus: PhotoDraftStatus }) => {
+type AnnotationSortOrder = "newest" | "oldest";
+
+const AnnotationList = ({
+	draftStatus,
+	sortOrder,
+	setSortOrder,
+	imageWidth,
+	imageHeight,
+}: {
+	draftStatus: PhotoDraftStatus;
+	sortOrder: AnnotationSortOrder;
+	setSortOrder: (order: AnnotationSortOrder) => void;
+	imageWidth: number;
+	imageHeight: number;
+}) => {
 	const annotator = useAnnotator();
 	const annotations = useAnnotations();
 	const { selected } = useSelection();
 	const selectedId = selected[0]?.annotation.id;
+	const orderedAnnotations =
+		sortOrder === "newest" ? [...annotations].reverse() : annotations;
+	const removeAnnotation = async (
+		annotation: ImageAnnotation,
+		label: string | undefined,
+	) => {
+		if (label) {
+			const confirmed = await AnnotationDeleteConfirmation.call({});
+			if (!confirmed) return;
+		}
+
+		const row = document
+			.querySelector<HTMLButtonElement>(
+				`[data-annotation-id="${CSS.escape(annotation.id)}"]`,
+			)
+			?.closest("li");
+		const target =
+			row?.nextElementSibling?.querySelector<HTMLButtonElement>(
+				"[data-annotation-id]",
+			) ??
+			row?.previousElementSibling?.querySelector<HTMLButtonElement>(
+				"[data-annotation-id]",
+			) ??
+			document.querySelector<HTMLHeadingElement>("[data-annotations-heading]");
+
+		annotator?.removeAnnotation(annotation.id);
+		requestAnimationFrame(() => target?.focus({ preventScroll: true }));
+	};
 
 	return (
 		<section
@@ -182,19 +230,39 @@ const AnnotationList = ({ draftStatus }: { draftStatus: PhotoDraftStatus }) => {
 		>
 			<div className="flex h-12 shrink-0 items-center gap-2.5 px-4">
 				<ScanSearch aria-hidden="true" className="size-4 text-primary" />
-				<h2
-					data-annotations-heading
-					tabIndex={-1}
-					className="m-0 flex-1 text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-accent"
-				>
-					Annotations
-				</h2>
-				<output
-					aria-label={`${annotations.length} ${annotations.length === 1 ? "annotation" : "annotations"}`}
-					className="rounded bg-primary-light px-2 py-0.5 text-xs font-semibold tabular-nums text-primary"
-				>
-					{annotations.length}
-				</output>
+				<div className="flex min-w-0 items-center gap-2.5">
+					<h2
+						data-annotations-heading
+						tabIndex={-1}
+						className="m-0 text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-accent"
+					>
+						Annotations
+					</h2>
+					<output
+						aria-label={`${annotations.length} ${annotations.length === 1 ? "annotation" : "annotations"}`}
+						className="rounded bg-primary-light px-2 py-0.5 text-xs font-semibold tabular-nums text-primary"
+					>
+						{annotations.length > 999 ? "+999" : annotations.length}
+					</output>
+				</div>
+				<fieldset className="relative m-0 ml-auto inline-grid shrink-0 grid-cols-2 rounded-md border-0 bg-surface-muted p-0.5">
+					<legend className="sr-only">Annotation order</legend>
+					<span
+						aria-hidden="true"
+						className={`absolute inset-y-0.5 left-0.5 w-[calc(50%_-_0.125rem)] rounded bg-surface shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none ${sortOrder === "oldest" ? "translate-x-full" : "translate-x-0"}`}
+					/>
+					{(["newest", "oldest"] as const).map((order) => (
+						<button
+							key={order}
+							type="button"
+							aria-pressed={sortOrder === order}
+							onClick={() => setSortOrder(order)}
+							className={`relative min-h-9 cursor-pointer rounded px-2 text-xs font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none ${sortOrder === order ? "text-primary" : "text-neutral-dark hover:text-secondary"}`}
+						>
+							{order === "newest" ? "Newest" : "Oldest"}
+						</button>
+					))}
+				</fieldset>
 			</div>
 			<p
 				aria-live="polite"
@@ -220,77 +288,148 @@ const AnnotationList = ({ draftStatus }: { draftStatus: PhotoDraftStatus }) => {
 					</p>
 				</div>
 			) : (
-				<ul className="m-0 max-h-72 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain px-2 pb-2 md:max-h-none [@media(max-height:34rem)_and_(min-width:40rem)]:max-h-48">
-					{annotations.map((annotation, index) => {
-						const label = annotation.bodies
-							.find((body) => body.purpose === "commenting")
-							?.value?.trim();
+				<>
+					<p id="annotation-keyboard-help" className="sr-only">
+						Focus an annotation row. Arrow keys move its box 10 pixels; Alt plus
+						an arrow moves it 1 pixel. Shift plus an arrow resizes it. Enter
+						edits its label. Delete removes it.
+					</p>
+					<ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain px-2 pb-2">
+						{orderedAnnotations.map((annotation, index) => {
+							const label = annotation.bodies
+								.find((body) => body.purpose === "commenting")
+								?.value?.trim();
 
-						return (
-							<li
-								key={annotation.id}
-								className={`group flex min-w-0 items-center rounded-lg px-1.5 py-1 ${selectedId === annotation.id ? "bg-primary-light" : "hover:bg-surface-muted"}`}
-							>
-								<button
-									type="button"
-									onClick={() => annotator?.setSelected(annotation.id)}
-									aria-label={`Edit label for annotation ${index + 1}${label ? `: ${label}` : ""}`}
-									data-annotation-id={annotation.id}
-									aria-pressed={selectedId === annotation.id}
-									title={label || "Add a label"}
-									className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-secondary focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:min-h-9"
+							return (
+								<li
+									key={annotation.id}
+									className={`group flex min-w-0 items-center rounded-lg px-1.5 py-1 ${selectedId === annotation.id ? "bg-primary-light" : "hover:bg-surface-muted"}`}
 								>
-									<span className="grid size-5 shrink-0 place-items-center rounded bg-primary-light text-tiny font-medium tabular-nums text-primary">
-										{index + 1}
-									</span>
-									<span
-										className={`truncate ${label ? "font-medium" : "text-neutral-dark"}`}
+									<button
+										type="button"
+										onClick={() => annotator?.setSelected(annotation.id)}
+										aria-label={`Edit label for annotation ${index + 1}${label ? `: ${label}` : ""}`}
+										aria-describedby="annotation-keyboard-help"
+										aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Delete Enter"
+										onKeyDown={(event) => {
+											if (event.key === "Delete") {
+												event.preventDefault();
+												if (!event.repeat)
+													void removeAnnotation(annotation, label);
+												return;
+											}
+
+											if (!event.key.startsWith("Arrow")) return;
+											event.preventDefault();
+											const selector = annotation.target.selector;
+											if (selector.type !== ShapeType.RECTANGLE) return;
+
+											const geometry = adjustRectangleForKey(
+												selector.geometry as RectangleGeometry,
+												event.key as
+													| "ArrowDown"
+													| "ArrowLeft"
+													| "ArrowRight"
+													| "ArrowUp",
+												imageWidth,
+												imageHeight,
+												event.shiftKey,
+												event.altKey,
+											);
+											annotator?.updateAnnotation({
+												...annotation,
+												target: {
+													...annotation.target,
+													selector: { ...selector, geometry },
+												},
+											});
+										}}
+										data-annotation-id={annotation.id}
+										aria-pressed={selectedId === annotation.id}
+										title={label || "Add a label"}
+										className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-secondary focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:min-h-9"
 									>
-										{label || "Add a label…"}
-									</span>
-								</button>
-								<button
-									type="button"
-									onClick={async () => {
-										if (label) {
-											const confirmed = await AnnotationDeleteConfirmation.call(
-												{},
-											);
-											if (!confirmed) return;
-										}
+										<span className="grid size-5 shrink-0 place-items-center rounded bg-primary-light text-tiny font-medium tabular-nums text-primary">
+											{index + 1}
+										</span>
+										<span
+											className={`truncate ${label ? "font-medium" : "text-neutral-dark"}`}
+										>
+											{label || "Add a label…"}
+										</span>
+									</button>
+									<button
+										type="button"
+										onClick={async () => {
+											if (label) {
+												const confirmed =
+													await AnnotationDeleteConfirmation.call({});
+												if (!confirmed) return;
+											}
 
-										const row = document
-											.querySelector<HTMLButtonElement>(
-												`[data-annotation-id="${CSS.escape(annotation.id)}"]`,
-											)
-											?.closest("li");
-										const target =
-											row?.nextElementSibling?.querySelector<HTMLButtonElement>(
-												"[data-annotation-id]",
-											) ??
-											row?.previousElementSibling?.querySelector<HTMLButtonElement>(
-												"[data-annotation-id]",
-											) ??
-											document.querySelector<HTMLHeadingElement>(
-												"[data-annotations-heading]",
-											);
+											const row = document
+												.querySelector<HTMLButtonElement>(
+													`[data-annotation-id="${CSS.escape(annotation.id)}"]`,
+												)
+												?.closest("li");
+											const target =
+												row?.nextElementSibling?.querySelector<HTMLButtonElement>(
+													"[data-annotation-id]",
+												) ??
+												row?.previousElementSibling?.querySelector<HTMLButtonElement>(
+													"[data-annotation-id]",
+												) ??
+												document.querySelector<HTMLHeadingElement>(
+													"[data-annotations-heading]",
+												);
 
-										annotator?.removeAnnotation(annotation.id);
-										requestAnimationFrame(() =>
-											target?.focus({ preventScroll: true }),
-										);
-									}}
-									aria-label={`Delete annotation ${index + 1}${label ? `: ${label}` : ""}`}
-									className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-md text-neutral-dark transition-colors hover:bg-error-light hover:text-error focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
-								>
-									<Trash2 aria-hidden="true" className="size-3.5" />
-								</button>
-							</li>
-						);
-					})}
-				</ul>
+											annotator?.removeAnnotation(annotation.id);
+											requestAnimationFrame(() =>
+												target?.focus({ preventScroll: true }),
+											);
+										}}
+										aria-label={`Delete annotation ${index + 1}${label ? `: ${label}` : ""}`}
+										className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-md text-neutral-dark transition-colors hover:bg-error-light hover:text-error focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
+									>
+										<Trash2 aria-hidden="true" className="size-3.5" />
+									</button>
+								</li>
+							);
+						})}
+					</ul>
+				</>
 			)}
 		</section>
+	);
+};
+
+const MobileInspectorToggle = ({
+	isOpen,
+	onToggle,
+}: {
+	isOpen: boolean;
+	onToggle: () => void;
+}) => {
+	const annotations = useAnnotations();
+
+	return (
+		<button
+			type="button"
+			aria-expanded={isOpen}
+			aria-controls="photo-inspector-content"
+			onClick={onToggle}
+			className="flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent lg:hidden"
+		>
+			<span className="flex-1">Annotations</span>
+			<output className="rounded bg-primary-light px-2 py-0.5 text-xs tabular-nums text-primary">
+				{annotations.length}
+			</output>
+			{isOpen ? (
+				<ChevronDown aria-hidden="true" className="size-4" />
+			) : (
+				<ChevronUp aria-hidden="true" className="size-4" />
+			)}
+		</button>
 	);
 };
 
@@ -313,12 +452,15 @@ type AnnotationNumberMarkersProps = Pick<
 const AnnotationNumberMarkers = ({
 	imageWidth,
 	imageHeight,
-}: AnnotationNumberMarkersProps) => {
+	sortOrder,
+}: AnnotationNumberMarkersProps & { sortOrder: AnnotationSortOrder }) => {
 	const annotations = useAnnotations();
+	const orderedAnnotations =
+		sortOrder === "newest" ? [...annotations].reverse() : annotations;
 
 	return (
 		<div aria-hidden="true" className="pointer-events-none absolute inset-0">
-			{annotations.map((annotation, index) => {
+			{orderedAnnotations.map((annotation, index) => {
 				const { minX, minY } = annotation.target.selector.geometry.bounds;
 
 				return (
@@ -399,8 +541,19 @@ const ImageAnnotationEditor = ({
 	photoDetails,
 }: ImageAnnotationEditorProps) => {
 	const [zoom, setZoom] = useState(1);
+	const [isMobileInspectorOpen, setIsMobileInspectorOpen] = useState(true);
+	const [annotationSortOrder, setAnnotationSortOrder] =
+		useState<AnnotationSortOrder>("newest");
+	const [isEditMode, setIsEditMode] = useState(false);
+	const [isPinching, setIsPinching] = useState(false);
 	const [fitWidth, setFitWidth] = useState<number | null>(null);
 	const photoScrollerRef = useRef<HTMLDivElement>(null);
+	const zoomRef = useRef(zoom);
+	const preservePinchPositionRef = useRef(false);
+
+	useLayoutEffect(() => {
+		zoomRef.current = zoom;
+	}, [zoom]);
 
 	useLayoutEffect(() => {
 		const frame = photoScrollerRef.current?.parentElement;
@@ -422,6 +575,7 @@ const ImageAnnotationEditor = ({
 		const scroller = photoScrollerRef.current;
 		const photo = scroller?.firstElementChild;
 		if (!scroller || !photo || fitWidth === null) return;
+		if (preservePinchPositionRef.current) return;
 		const bounds = photo.getBoundingClientRect();
 		const scaledWidth = fitWidth * zoom;
 		const scaledHeight = (scaledWidth * imageHeight) / imageWidth;
@@ -435,6 +589,99 @@ const ImageAnnotationEditor = ({
 				: 0;
 	}, [fitWidth, imageHeight, imageWidth, zoom]);
 
+	useEffect(() => {
+		const scroller = photoScrollerRef.current;
+		if (!scroller) return;
+
+		let pinch: {
+			distance: number;
+			zoom: number;
+			imageX: number;
+			imageY: number;
+		} | null = null;
+		let frame = 0;
+		const getCenter = (touches: TouchList) => ({
+			x: (touches[0].clientX + touches[1].clientX) / 2,
+			y: (touches[0].clientY + touches[1].clientY) / 2,
+		});
+		const getDistance = (touches: TouchList) =>
+			Math.hypot(
+				touches[0].clientX - touches[1].clientX,
+				touches[0].clientY - touches[1].clientY,
+			);
+		const onTouchStart = (event: TouchEvent) => {
+			if (event.touches.length < 2 || fitWidth === null) return;
+			setIsPinching(true);
+			const photo = scroller.firstElementChild;
+			if (!photo) return;
+			const center = getCenter(event.touches);
+			const bounds = photo.getBoundingClientRect();
+			pinch = {
+				distance: getDistance(event.touches),
+				zoom: zoomRef.current,
+				imageX: Math.max(
+					0,
+					Math.min(1, (center.x - bounds.left) / bounds.width),
+				),
+				imageY: Math.max(
+					0,
+					Math.min(1, (center.y - bounds.top) / bounds.height),
+				),
+			};
+		};
+		const onTouchMove = (event: TouchEvent) => {
+			if (!pinch || event.touches.length < 2 || fitWidth === null) return;
+			event.preventDefault();
+			const pinchState = pinch;
+			const nextZoom = Math.max(
+				0.25,
+				Math.min(
+					4,
+					pinchState.zoom * (getDistance(event.touches) / pinchState.distance),
+				),
+			);
+			const center = getCenter(event.touches);
+			const bounds = scroller.getBoundingClientRect();
+			setZoom(nextZoom);
+			zoomRef.current = nextZoom;
+			preservePinchPositionRef.current = true;
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => {
+				const width = fitWidth * nextZoom;
+				const height = (width * imageHeight) / imageWidth;
+				const offsetX = Math.max(0, (scroller.clientWidth - width) / 2);
+				const offsetY = Math.max(0, (scroller.clientHeight - height) / 2);
+				scroller.scrollLeft = Math.max(
+					0,
+					pinchState.imageX * width + offsetX - (center.x - bounds.left),
+				);
+				scroller.scrollTop = Math.max(
+					0,
+					pinchState.imageY * height + offsetY - (center.y - bounds.top),
+				);
+				preservePinchPositionRef.current = false;
+			});
+		};
+		const onTouchEnd = (event: TouchEvent) => {
+			if (event.touches.length < 2) {
+				pinch = null;
+				setIsPinching(false);
+			}
+		};
+
+		scroller.addEventListener("touchstart", onTouchStart, { passive: true });
+		scroller.addEventListener("touchmove", onTouchMove, { passive: false });
+		scroller.addEventListener("touchend", onTouchEnd, { passive: true });
+		scroller.addEventListener("touchcancel", onTouchEnd, { passive: true });
+		return () => {
+			cancelAnimationFrame(frame);
+			scroller.removeEventListener("touchstart", onTouchStart);
+			scroller.removeEventListener("touchmove", onTouchMove);
+			scroller.removeEventListener("touchend", onTouchEnd);
+			scroller.removeEventListener("touchcancel", onTouchEnd);
+		};
+	}, [fitWidth, imageHeight, imageWidth]);
+
 	const photoWidth =
 		fitWidth === null
 			? `min(100cqw, ${(imageWidth / imageHeight) * 100}cqh)`
@@ -442,18 +689,40 @@ const ImageAnnotationEditor = ({
 
 	return (
 		<Annotorious>
-			<div className="grid min-h-0 min-w-0 flex-1 grid-rows-[max(17rem,40dvh)_auto] overflow-y-auto md:grid-cols-[minmax(0,1fr)_20rem] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden [@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[minmax(0,1fr)_17rem] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-[minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-hidden">
+			<div
+				className={`grid min-h-0 min-w-0 flex-1 overflow-hidden transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${isMobileInspectorOpen ? "grid-rows-[minmax(0,1fr)_min(50dvh,24rem)]" : "grid-rows-[minmax(0,1fr)_3.5rem]"} lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:lg:grid-cols-[minmax(0,1fr)_17rem]`}
+			>
 				<section
 					aria-label="Photo canvas"
 					className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-surface-muted"
 				>
-					<div className="flex min-h-11 items-center justify-between gap-3 border-b border-border/60 bg-surface px-3 sm:px-4">
-						<span className="inline-flex items-center gap-2 rounded-md bg-primary-light px-2.5 py-1.5 text-xs font-medium text-primary">
-							<SquareDashedMousePointer aria-hidden="true" className="size-4" />
-							Rectangle
-						</span>
-						<p className="m-0 text-xs text-neutral-dark">
-							Drag to mark an area
+					<div className="flex min-h-11 items-center justify-between gap-2 border-b border-border/60 bg-surface px-3 sm:px-4">
+						<SegmentedToggle
+							ariaLabel="Annotation mode"
+							value={isEditMode ? "edit" : "draw"}
+							onValueChange={(value) => setIsEditMode(value === "edit")}
+							options={[
+								{
+									value: "draw",
+									label: "Draw boxes",
+									icon: (
+										<SquareDashedMousePointer
+											aria-hidden="true"
+											className="size-3.5"
+										/>
+									),
+								},
+								{
+									value: "edit",
+									label: "Edit boxes",
+									icon: <Move aria-hidden="true" className="size-3.5" />,
+								},
+							]}
+						/>
+						<p className="m-0 min-w-0 flex-1 truncate text-right text-xs text-neutral-dark">
+							{isEditMode
+								? "Select a box · Drag to move or resize"
+								: "Drag to mark · Pinch to zoom"}
 						</p>
 					</div>
 					<div className="min-h-0 min-w-0 p-3 sm:p-6 [@media(max-height:34rem)_and_(min-width:40rem)]:p-3">
@@ -469,9 +738,10 @@ const ImageAnnotationEditor = ({
 								}}
 							>
 								<ImageAnnotator
-									containerClassName="relative size-full [&_.a9s-inner]:fill-primary/5! [&_.a9s-inner]:stroke-primary! [&_.a9s-outer]:hidden! [&_.a9s-inner]:[stroke-width:1px]! [&_.a9s-handle-dot]:stroke-primary!"
+									containerClassName={`relative size-full [&_.a9s-inner]:fill-primary/5! [&_.a9s-inner]:stroke-primary! [&_.a9s-outer]:hidden! [&_.a9s-inner]:[stroke-width:1px]! [&_.a9s-handle-dot]:stroke-primary! ${isEditMode ? "[&_.a9s-annotationlayer.hover]:cursor-move!" : ""}`}
+									drawingEnabled={!isPinching && !isEditMode}
 									drawingMode="drag"
-									tool="rectangle"
+									tool={isEditMode ? undefined : "rectangle"}
 								>
 									<img
 										src={imageUrl}
@@ -484,58 +754,52 @@ const ImageAnnotationEditor = ({
 								<AnnotationNumberMarkers
 									imageWidth={imageWidth}
 									imageHeight={imageHeight}
+									sortOrder={annotationSortOrder}
 								/>
 							</div>
 						</div>
 					</div>
-					<div className="flex min-h-11 items-center justify-between gap-2 border-t border-border/60 bg-surface px-3 text-xs tabular-nums text-neutral-dark sm:px-4">
-						<span className="shrink-0">
-							{imageWidth} × {imageHeight}
-						</span>
-						<fieldset className="m-0 inline-flex shrink-0 items-center gap-1 border-0 p-0">
-							<legend className="sr-only">Photo zoom</legend>
-							<button
-								type="button"
-								aria-label="Zoom out"
-								title="Zoom out"
-								disabled={zoom <= 0.25}
-								onClick={() =>
-									setZoom((current) => Math.max(0.25, current - 0.25))
-								}
-								className="inline-flex size-10 items-center justify-center rounded-md text-neutral-dark hover:bg-surface-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-							>
-								<Minus aria-hidden="true" className="size-4" />
-							</button>
-							<button
-								type="button"
-								aria-label="Fit photo to view"
-								title="Reset zoom to Fit; percentage is relative to Fit"
-								onClick={() => setZoom(1)}
-								className="min-h-10 rounded-md px-2 text-xs font-medium text-neutral-dark hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-							>
-								{Math.round(zoom * 100)}%
-							</button>
-							<button
-								type="button"
-								aria-label="Zoom in"
-								title="Zoom in"
-								disabled={zoom >= 4}
-								onClick={() =>
-									setZoom((current) => Math.min(4, current + 0.25))
-								}
-								className="inline-flex size-10 items-center justify-center rounded-md text-neutral-dark hover:bg-surface-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-							>
-								<Plus aria-hidden="true" className="size-4" />
-							</button>
-						</fieldset>
-					</div>
+					<PhotoZoomControls
+						imageWidth={imageWidth}
+						imageHeight={imageHeight}
+						zoom={zoom}
+						setZoom={setZoom}
+					/>
 				</section>
 				<aside
 					aria-label="Photo inspector"
-					className="flex min-w-0 flex-col border-t border-border/60 bg-surface text-left md:min-h-0 md:overflow-hidden md:border-l md:border-t-0 [@media(max-height:34rem)_and_(min-width:40rem)]:min-h-0 [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-y-auto [@media(max-height:34rem)_and_(min-width:40rem)]:border-l [@media(max-height:34rem)_and_(min-width:40rem)]:border-t-0"
+					className="min-h-0 min-w-0 overflow-hidden border-t border-border/60 bg-surface text-left lg:flex lg:flex-col lg:border-l lg:border-t-0"
 				>
-					{photoDetails}
-					<AnnotationList draftStatus={draftStatus} />
+					<MobileInspectorToggle
+						isOpen={isMobileInspectorOpen}
+						onToggle={() => setIsMobileInspectorOpen((open) => !open)}
+					/>
+					<div
+						id="photo-inspector-content"
+						className={
+							isMobileInspectorOpen
+								? "flex min-h-0 flex-col overflow-hidden lg:flex-1"
+								: "hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden"
+						}
+					>
+						<details className="group shrink-0 border-b border-border/60">
+							<summary className="flex min-h-12 cursor-pointer list-none items-center px-4 text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+								<span className="flex-1">Photo details</span>
+								<ChevronDown
+									aria-hidden="true"
+									className="size-4 text-neutral-dark transition-transform duration-200 ease-out group-open:rotate-180 motion-reduce:transition-none"
+								/>
+							</summary>
+							{photoDetails}
+						</details>
+						<AnnotationList
+							draftStatus={draftStatus}
+							sortOrder={annotationSortOrder}
+							setSortOrder={setAnnotationSortOrder}
+							imageWidth={imageWidth}
+							imageHeight={imageHeight}
+						/>
+					</div>
 				</aside>
 			</div>
 			{draftId && (
