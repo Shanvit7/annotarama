@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
 	analysisSize,
 	analyzeGray,
+	assessPhoto,
 	classifyQuality,
 	createQualityFilter,
 	meanAbsoluteDifference,
@@ -36,6 +37,46 @@ const balanced = {
 };
 const classify = (patch = {}, motion = 0) =>
 	classifyQuality({ ...balanced, ...patch }, motion);
+
+test("photo assessment applies resolution and file-size thresholds", () => {
+	assert.deepEqual(assessPhoto({ width: 999, height: 1000, bytes: 100_000 }), {
+		resolution: "poor",
+		fileSize: "good",
+		overall: "poor",
+		advice: "Low resolution — use a higher-resolution camera for more detail.",
+	});
+	assert.equal(
+		assessPhoto({ width: 1000, height: 1000, bytes: 100_000 }).overall,
+		"warning",
+	);
+	assert.equal(
+		assessPhoto({ width: 1414, height: 1414, bytes: 100_000 }).resolution,
+		"warning",
+	);
+	assert.deepEqual(assessPhoto({ width: 1415, height: 1415, bytes: 99_999 }), {
+		resolution: "good",
+		fileSize: "warning",
+		overall: "warning",
+		advice: "File is unusually small — check image detail before annotating.",
+	});
+	assert.deepEqual(assessPhoto({ width: 2000, height: 1500, bytes: 100_000 }), {
+		resolution: "good",
+		fileSize: "good",
+		overall: "good",
+		advice: null,
+	});
+});
+
+test("invalid photo dimensions and byte counts return unknown assessment", () => {
+	assert.equal(
+		assessPhoto({ width: 0, height: 100, bytes: 100 }).overall,
+		"unknown",
+	);
+	assert.equal(
+		assessPhoto({ width: 100, height: 100, bytes: -1 }).overall,
+		"unknown",
+	);
+});
 
 test("aspect ratio, longest-side cap, no upscaling, rounded luma", () => {
 	assert.deepEqual(analysisSize(1920, 1080), { width: 320, height: 180 });

@@ -4,6 +4,7 @@ import {
 	RouteNotFoundPage,
 } from "@/components/organisms/route-state-page";
 import { APP_BASE_PATH } from "@/lib/constants";
+import { logger } from "@/lib/logger";
 import { routeTree } from "@/routeTree.gen";
 
 export function getRouter() {
@@ -15,6 +16,8 @@ export function getRouter() {
 		defaultPreloadStaleTime: 0,
 		defaultErrorComponent: RouteErrorPage,
 		defaultNotFoundComponent: RouteNotFoundPage,
+		defaultOnCatch: (error, errorInfo) =>
+			logger.error("React error boundary caught an error", error, errorInfo),
 	});
 
 	return router;

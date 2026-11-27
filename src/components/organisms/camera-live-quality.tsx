@@ -1,5 +1,6 @@
 import { Camera, CircleCheck, TriangleAlert } from "lucide-react";
 import {
+	assessPhoto,
 	type LiveQuality,
 	type QualityStatus,
 	qualitySuggestion,
@@ -29,9 +30,9 @@ const stabilityLabels: Record<QualityStatus, string> = {
 	poor: "High movement",
 	unknown: "Unknown",
 };
-const qualityLabels: Record<QualityStatus, string> = {
+const photoQualityLabels: Record<QualityStatus, string> = {
 	good: "Good",
-	warning: "Needs review",
+	warning: "Fair",
 	poor: "Poor",
 	unknown: "Not checked",
 };
@@ -99,7 +100,7 @@ const LiveQualityIndicator = ({
 	return (
 		<section
 			aria-label="Live camera quality"
-			className="pointer-events-none absolute left-1/2 top-3 z-10 w-[calc(100%_-_1.5rem)] max-w-[22rem] -translate-x-1/2 rounded-xl border border-surface/20 bg-secondary/50 p-2.5 text-surface shadow-lg backdrop-blur-sm"
+			className="pointer-events-none absolute left-1/2 top-3 z-10 w-[calc(100%_-_1.5rem)] max-w-[22rem] -translate-x-1/2 rounded-xl border border-surface/20 bg-secondary/40 p-2.5 text-surface shadow-lg backdrop-blur-md"
 		>
 			<div className="flex flex-col gap-1.5">
 				<div className="flex items-center gap-2">
@@ -132,8 +133,8 @@ const LiveQualityIndicator = ({
 			</div>
 			<p className="sr-only">
 				Focus estimates sharpness, not autofocus. Stability estimates scene
-				motion, not camera shake. Preview resolution is not still-photo
-				resolution.
+				motion, not camera shake. The center box is a framing guide, not an
+				autofocus control. Preview resolution is not still-photo resolution.
 			</p>
 		</section>
 	);
@@ -148,7 +149,46 @@ type CapturedPhotoSummaryProps = {
 	width: number;
 	height: number;
 	fileSize: string;
-	onRetake: () => void;
+	bytes: number;
+	onRetake?: () => void;
+	variant?: "panel" | "overlay";
+};
+
+type PhotoMetric = {
+	label: string;
+	value: string;
+	status: QualityStatus;
+};
+
+const getSummaryPresentation = (
+	variant: NonNullable<CapturedPhotoSummaryProps["variant"]>,
+	status: QualityStatus,
+	metrics: PhotoMetric[],
+) => {
+	const isOverlay = variant === "overlay";
+	return {
+		sectionClass: isOverlay
+			? "pointer-events-none absolute left-1/2 top-3 z-10 w-[calc(100%_-_1.5rem)] max-w-[22rem] -translate-x-1/2 rounded-xl border border-surface/20 bg-secondary/80 p-2.5 text-left text-surface shadow-lg backdrop-blur-sm"
+			: "min-w-0 shrink-0 border-b border-border/60 p-4",
+		heading: isOverlay
+			? `Photo quality · ${photoQualityLabels[status]}`
+			: "Photo details",
+		headingClass: isOverlay ? "text-surface" : "sr-only",
+		labelClass: isOverlay ? "text-surface/70" : "text-neutral-dark",
+		metrics: isOverlay ? metrics.slice(1) : metrics,
+		valueTones: isOverlay ? liveTones : tones,
+		adviceTone: isOverlay
+			? status === "poor"
+				? "font-semibold text-error-light"
+				: status === "warning"
+					? "text-amber-100"
+					: "text-surface/85"
+			: status === "poor"
+				? "font-semibold text-error"
+				: status === "warning"
+					? "text-amber-900"
+					: "text-neutral-dark",
+	};
 };
 
 export const CapturedPhotoSummary = ({
@@ -156,66 +196,86 @@ export const CapturedPhotoSummary = ({
 	width,
 	height,
 	fileSize,
+	bytes,
 	onRetake,
+	variant = "panel",
 }: CapturedPhotoSummaryProps) => {
-	const qualityLabel = quality.unavailable
-		? "Unavailable"
-		: qualityLabels[quality.overall];
-	const qualityStatus = quality.unavailable ? "unknown" : quality.overall;
-	const metrics = [
-		{ label: "Live quality", value: qualityLabel, status: qualityStatus },
-		{ label: "Resolution", value: `${width} × ${height}` },
-		{ label: "File size", value: fileSize },
+	const assessment = assessPhoto({ width, height, bytes });
+	const metrics: PhotoMetric[] = [
 		{
-			label: "Focus",
+			label: "Photo quality",
+			value: photoQualityLabels[assessment.overall],
+			status: assessment.overall,
+		},
+		{
+			label: "Resolution",
+			value: `${width} × ${height}`,
+			status: assessment.resolution,
+		},
+		{ label: "File size", value: fileSize, status: assessment.fileSize },
+		{
+			label: "Live focus",
 			value: focusLabels[quality.focus],
 			status: quality.focus,
 		},
 		{
-			label: "Lighting",
+			label: "Live lighting",
 			value: lightingLabels[quality.lightingDirection],
 			status: quality.lighting,
 		},
 		{
-			label: "Stability",
+			label: "Live stability",
 			value: stabilityLabels[quality.stability],
 			status: quality.stability,
 		},
 	];
+	const presentation = getSummaryPresentation(
+		variant,
+		assessment.overall,
+		metrics,
+	);
 
 	return (
 		<section
 			aria-labelledby="captured-photo-summary-heading"
-			className="min-w-0 shrink-0 border-b border-border/60 p-4"
+			className={presentation.sectionClass}
 		>
 			<h2
 				id="captured-photo-summary-heading"
-				className="m-0 text-sm font-semibold text-secondary"
+				className={`m-0 text-sm font-semibold ${presentation.headingClass}`}
 			>
-				Photo details
+				{presentation.heading}
 			</h2>
 			<dl className="m-0 mt-3 grid grid-cols-3 gap-x-3 gap-y-3">
-				{metrics.map(({ label, value, status }) => (
+				{presentation.metrics.map(({ label, value, status }) => (
 					<div key={label} className="min-w-0">
-						<dt className="text-tiny leading-4 text-neutral-dark">{label}</dt>
+						<dt className={`text-tiny leading-4 ${presentation.labelClass}`}>
+							{label}
+						</dt>
 						<dd
-							className={`m-0 mt-0.5 break-words text-tiny font-semibold leading-4 tabular-nums ${status ? tones[status] : "text-secondary"}`}
+							className={`m-0 mt-0.5 break-words text-tiny font-semibold leading-4 tabular-nums ${presentation.valueTones[status]}`}
 						>
 							{value}
 						</dd>
 					</div>
 				))}
 			</dl>
-			<p className="m-0 mt-3 text-tiny leading-4 text-neutral-dark">
-				Live estimates before capture; final photo quality may differ.
-			</p>
-			<button
-				type="button"
-				onClick={onRetake}
-				className="mt-3 inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-md border border-border px-3 text-sm font-medium text-secondary transition-colors hover:bg-primary-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [@media(pointer:fine)]:min-h-8"
+			<p
+				role={assessment.advice ? "status" : undefined}
+				className={`m-0 mt-3 text-tiny leading-4 ${presentation.adviceTone}`}
 			>
-				Retake photo
-			</button>
+				{assessment.advice ??
+					"Focus, lighting and movement are live estimates; resolution and file size use this photo."}
+			</p>
+			{onRetake && (
+				<button
+					type="button"
+					onClick={onRetake}
+					className="mt-3 inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-md border border-border px-3 text-sm font-medium text-secondary transition-colors hover:bg-primary-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [@media(pointer:fine)]:min-h-8"
+				>
+					Retake photo
+				</button>
+			)}
 		</section>
 	);
 };

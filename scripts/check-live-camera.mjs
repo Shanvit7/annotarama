@@ -1,8 +1,8 @@
 // Run with the dev server: ego-browser nodejs < scripts/check-live-camera.mjs
 // Deterministic canvas stream; never requests physical camera permission.
 const assert = (await import("node:assert/strict")).default;
-const existing = (await listTaskSpaces()).find((space) => space.name === "Verify mobile Get Ready layout");
-const task = !existing ? await taskSpace("Verify mobile Get Ready layout") :
+const existing = (await listTaskSpaces()).find((space) => space.name === "Camera transparency and framing guide");
+const task = !existing ? await taskSpace("Camera transparency and framing guide") :
 	existing.ownership === "user" ? await claimTaskSpace(existing.id) :
 	await taskSpace(existing.id);
 const page = (await task.pages())[0] ?? await task.adopt((await task.tabs())[0].page);
@@ -12,16 +12,16 @@ const checkLayout = async (stage) => {
 	for (const [width, height] of [[393, 852], [412, 924], [768, 1024], [1024, 768], [1440, 900]]) {
 		await page.cdp("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 1280 });
 		const bounds = await page.evaluate(() => {
-			const header = document.querySelector("header").getBoundingClientRect();
+			const headerHeight = document.querySelector("header")?.getBoundingClientRect().height ?? 0;
 			const main = document.querySelector("main").getBoundingClientRect();
 			const workspace = document.querySelector("[data-capture-workspace]").getBoundingClientRect();
 			const start = [...document.querySelectorAll("button")].find((button) => button.textContent.includes("Start camera"))?.getBoundingClientRect();
 			const frame = document.querySelector("video").parentElement;
 			const cornerRadius = getComputedStyle(frame).borderTopLeftRadius;
 			const video = document.querySelector("video").getBoundingClientRect();
-			return { videoWidth: video.width, videoHeight: video.height, cornerRadius, headerHeight: header.height, mainHeight: main.height, workspaceHeight: workspace.height, mainTop: main.top, mainBottom: main.bottom, mainWidth: main.width, startTop: start?.top, startBottom: start?.bottom, overflow: document.documentElement.scrollWidth > innerWidth };
+			return { videoWidth: video.width, videoHeight: video.height, cornerRadius, headerHeight, mainHeight: main.height, workspaceHeight: workspace.height, mainTop: main.top, mainBottom: main.bottom, mainWidth: main.width, startTop: start?.top, startBottom: start?.bottom, overflow: document.documentElement.scrollWidth > innerWidth };
 		});
-		assert.equal(bounds.headerHeight > 0, width >= 1280, `${stage}: title visibility at ${width}`);
+		assert.equal(bounds.headerHeight, 0, `${stage}: capture header is absent at ${width}`);
 		assert.ok(bounds.workspaceHeight > height / 2, `${stage}: workspace fills available height at ${width}`);
 		assert.ok(bounds.mainBottom <= height + 1, `${stage}: main fits viewport at ${width}`);
 		assert.equal(bounds.overflow, false);
@@ -81,9 +81,58 @@ await page.evaluate(() => {
 	window.cameraQA = state;
 });
 const waitForText = async (text) => page.waitForFunction((value) => document.body.textContent.includes(value), text, { timeout: 15000 });
+const readDraftAnnotations = () => page.evaluate(async () => {
+	const database = await new Promise((resolve, reject) => {
+		const request = indexedDB.open("annotarama-photo-drafts");
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () => reject(request.error);
+	});
+	const id = sessionStorage.getItem("annotarama:photo-session");
+	return await new Promise((resolve, reject) => {
+		const request = database.transaction("drafts").objectStore("drafts").get(id);
+		request.onsuccess = () => resolve(request.result?.annotations ?? null);
+		request.onerror = () => reject(request.error);
+	});
+});
+const seedDraftAnnotations = (annotations) => page.evaluate(async (newAnnotations) => {
+	const database = await new Promise((resolve, reject) => {
+		const request = indexedDB.open("annotarama-photo-drafts");
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () => reject(request.error);
+	});
+	const id = sessionStorage.getItem("annotarama:photo-session");
+	const transaction = database.transaction("drafts", "readwrite");
+	const store = transaction.objectStore("drafts");
+	const draft = await new Promise((resolve, reject) => {
+		const request = store.get(id);
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () => reject(request.error);
+	});
+	draft.annotations = newAnnotations;
+	store.put(draft);
+	await new Promise((resolve, reject) => {
+		transaction.oncomplete = resolve;
+		transaction.onerror = () => reject(transaction.error);
+	});
+}, annotations);
 await page.click('text="Start camera"');
 await page.waitForSelector('[aria-label="Capture photo"]', { state: "visible" });
 await checkLayout("live");
+assert.deepEqual(await page.evaluate(() => {
+	const guide = document.querySelector("[data-camera-focus-guide]");
+	const guideBounds = guide.getBoundingClientRect();
+	const previewBounds = document.querySelector("video").getBoundingClientRect();
+	return {
+		role: guide.getAttribute("role"),
+		label: guide.getAttribute("aria-label"),
+		centered: Math.abs((guideBounds.left + guideBounds.width / 2) - (previewBounds.left + previewBounds.width / 2)) < 1
+			&& Math.abs((guideBounds.top + guideBounds.height / 2) - (previewBounds.top + previewBounds.height / 2)) < 1,
+	};
+}), {
+	role: "img",
+	label: "Center framing guide. Does not control camera focus.",
+	centered: true,
+});
 assert.deepEqual(await page.evaluate(() => ({ width: document.querySelector("video").videoWidth, height: document.querySelector("video").videoHeight })), { width: 640, height: 480 });
 await page.click('[aria-label="Switch camera"]');
 await page.waitForFunction(() => window.cameraQA.activeCamera === "front-camera" && !!document.querySelector('[aria-label="Capture photo"]'));
@@ -115,74 +164,100 @@ for (const [width, height] of [[390, 844], [320, 568], [844, 390], [640, 360], [
 	layouts.push({ width, height, ...bounds });
 }
 await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-console.log({ layouts, screenshot: await page.screenshot({ path: "/tmp/annotarama-live-quality.png" }) });
+console.log({ layouts, screenshot: await page.screenshot({ path: "/tmp/annotarama-live-framing-guide.png" }) });
+// Native stills path: ImageCapture must win over the video-frame fallback and report real dimensions.
+await page.evaluate(() => {
+	class FakeImageCapture {
+		async getPhotoCapabilities() {
+			return { imageWidth: { max: 4032 }, imageHeight: { max: 3024 } };
+		}
+		async takePhoto() {
+			const canvas = document.createElement("canvas");
+			canvas.width = 4032;
+			canvas.height = 3024;
+			canvas.getContext("2d").fillRect(0, 0, 4032, 3024);
+			return await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+		}
+	}
+	window.ImageCapture = FakeImageCapture;
+});
+await page.click('[aria-label="Capture photo"]');
+await page.waitForSelector("#captured-photo-summary-heading");
+const nativeDetails = await page.evaluate(() => document.querySelector("#captured-photo-summary-heading")?.parentElement?.textContent ?? "");
+assert.match(nativeDetails, /4032 × 3024/, "native stills capture at sensor resolution");
+assert.match(nativeDetails, /Photo quality · Fair/, "small native photo receives a fair verdict");
+assert.match(nativeDetails, /File is unusually small/, "sub-100 KB photo explains its warning");
+assert.equal(await page.evaluate(() => !!document.querySelector('[aria-label="Review photo"]')), true);
+const sameCameraFrame = await page.evaluate(() => {
+	const image = document.querySelector('img[alt="Captured scene"]');
+	const frame = image.parentElement.getBoundingClientRect();
+	const imageBounds = image.getBoundingClientRect();
+	const metrics = document.querySelector("#captured-photo-summary-heading").parentElement.getBoundingClientRect();
+	const continueButton = [...document.querySelectorAll("button")].find((button) => button.textContent.includes("Continue to annotate"));
+	const buttonBounds = continueButton.getBoundingClientRect();
+	return {
+		objectFit: getComputedStyle(image).objectFit,
+		imageFillsFrame: Math.abs(frame.width - imageBounds.width) < 1 && Math.abs(frame.height - imageBounds.height) < 1,
+		metricsAtTop: metrics.top < innerHeight / 3,
+		controlsAtBottom: buttonBounds.bottom > innerHeight - 80,
+	};
+});
+assert.deepEqual(sameCameraFrame, { objectFit: "cover", imageFillsFrame: true, metricsAtTop: true, controlsAtBottom: true });
+await seedDraftAnnotations([{ id: "old-annotation" }]);
+await page.click('text="Retake photo"');
+await page.waitForSelector('[aria-label="Capture photo"]');
+assert.equal(await readDraftAnnotations(), null, "Retake deletes the previous photo and annotations");
+await page.evaluate(() => {
+	delete window.ImageCapture;
+	window.cameraQA.dark = false;
+});
 await page.click('[aria-label="Capture photo"]');
 await page.waitForSelector("#captured-photo-summary-heading");
 await checkLayout("captured");
+await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+const mobileReviewScreenshot = await page.screenshot({ path: "/tmp/annotarama-photo-review-mobile.png" });
+await page.cdp("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+const desktopReviewScreenshot = await page.screenshot({ path: "/tmp/annotarama-photo-review-desktop.png" });
+console.log({ mobileReviewScreenshot, desktopReviewScreenshot });
+await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 assert.equal(await page.evaluate(() => !!document.querySelector('[aria-label="Live camera quality"]')), false);
+assert.equal(await page.evaluate(() => !!document.querySelector("[data-camera-focus-guide]")), false);
 const capturedDetails = await page.evaluate(() => document.querySelector("#captured-photo-summary-heading")?.parentElement?.textContent ?? "");
 assert.match(capturedDetails, /Resolution/);
 assert.match(capturedDetails, /File size/);
-assert.match(capturedDetails, /Live quality/);
-assert.match(capturedDetails, /Focus/);
-assert.match(capturedDetails, /Lighting/);
-assert.match(capturedDetails, /Stability/);
-await page.evaluate(async () => {
-	window.cameraQA.torch = false;
-	window.cameraQA.torchOn = false;
-	const database = await new Promise((resolve, reject) => {
-		const request = indexedDB.open("annotarama-photo-drafts");
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
-	});
-	const id = sessionStorage.getItem("annotarama:photo-session");
-	const transaction = database.transaction("drafts", "readwrite");
-	const store = transaction.objectStore("drafts");
-	const draft = await new Promise((resolve, reject) => {
-		const request = store.get(id);
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
-	});
-	draft.annotations = [{ id: "old-annotation" }];
-	store.put(draft);
-	await new Promise((resolve, reject) => {
-		transaction.oncomplete = resolve;
-		transaction.onerror = () => reject(transaction.error);
-	});
+assert.match(capturedDetails, /Photo quality · Poor/);
+assert.match(capturedDetails, /Low resolution/);
+assert.match(capturedDetails, /Live focus/);
+assert.match(capturedDetails, /Live lighting/);
+assert.match(capturedDetails, /Live stability/);
+assert.equal(await page.evaluate(() => !!document.querySelector('[aria-label="Review photo"]')), true);
+assert.equal(await page.evaluate(() => !!document.querySelector('[aria-label="Photo canvas"]')), false);
+assert.deepEqual(await readDraftAnnotations(), [], "New photo starts with no old annotations");
+await page.click('text="Continue to annotate"');
+await page.waitForSelector('[aria-label="Photo canvas"]');
+await page.evaluate(() => sessionStorage.removeItem("annotarama:photo-session"));
+await page.goto("http://localhost:3000/capture");
+await page.waitForSelector('button:has-text("Start camera")', { state: "visible" });
+await page.evaluate(() => {
+	const canvas = document.createElement("canvas");
+	canvas.width = 640;
+	canvas.height = 480;
+	const context = canvas.getContext("2d");
+	context.fillStyle = "#777";
+	context.fillRect(0, 0, 640, 480);
+	setInterval(() => context.fillRect(0, 0, 640, 480), 33);
+	const state = { denied: false, activeCamera: "rear-camera", cameras: ["rear-camera"] };
+	navigator.mediaDevices.enumerateDevices = async () => state.cameras.map((deviceId) => ({ kind: "videoinput", deviceId }));
+	navigator.mediaDevices.getUserMedia = async () => {
+		if (state.denied) throw new DOMException("Denied fixture", "NotAllowedError");
+		const stream = canvas.captureStream(30);
+		stream.getVideoTracks()[0].getCapabilities = () => ({ torch: false });
+		return stream;
+	};
+	window.cameraQA = state;
 });
-await page.click('text="Retake photo"');
-await page.waitForSelector('[aria-label="Live camera quality"]');
-assert.equal(await page.evaluate(() => !!document.querySelector("#captured-photo-summary-heading")), false);
-assert.equal(await page.evaluate(async () => {
-	const database = await new Promise((resolve, reject) => {
-		const request = indexedDB.open("annotarama-photo-drafts");
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
-	});
-	const id = sessionStorage.getItem("annotarama:photo-session");
-	return await new Promise((resolve, reject) => {
-		const request = database.transaction("drafts").objectStore("drafts").get(id);
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
-	});
-}), null, "Retake deletes previous photo and annotations");
-await page.click('[aria-label="Capture photo"]');
-await page.waitForSelector("#captured-photo-summary-heading");
-assert.deepEqual(await page.evaluate(async () => {
-	const database = await new Promise((resolve, reject) => {
-		const request = indexedDB.open("annotarama-photo-drafts");
-		request.onsuccess = () => resolve(request.result);
-		request.onerror = () => reject(request.error);
-	});
-	const id = sessionStorage.getItem("annotarama:photo-session");
-	return await new Promise((resolve, reject) => {
-		const request = database.transaction("drafts").objectStore("drafts").get(id);
-		request.onsuccess = () => resolve(request.result.annotations);
-		request.onerror = () => reject(request.error);
-	});
-}), [], "New photo starts with no old annotations");
-await page.click('text="Retake photo"');
-await page.waitForSelector('[aria-label="Live camera quality"]');
+await page.click('text="Start camera"');
+await page.waitForSelector('[aria-label="Capture photo"]');
 assert.doesNotMatch(await page.snapshot(), /Turn torch on/);
 await page.click('[aria-label="Stop camera"]');
 await page.evaluate(() => { window.cameraQA.denied = true; });
@@ -192,6 +267,6 @@ await waitForText("Allow camera access in your browser settings");
 await page.evaluate(() => { Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: undefined }); });
 await page.click('text="Try again"');
 await waitForText("Camera access is unavailable here");
-console.log("PASS: front/rear camera switching, balanced warmup, dark/stale advisory capture, supported/unsupported torch, capture/retake, permission denial, unsupported camera, five responsive layouts.");
+console.log("PASS: front/rear camera switching, sensor-resolution stills with frame fallback, balanced warmup, dark/stale advisory capture, supported/unsupported torch, capture/retake, permission denial, unsupported camera, five responsive layouts.");
 console.log({ spaceId: task.spaceId, page: page.label });
 // Inspect the screenshot, then finish this space in a separate ego-browser call.

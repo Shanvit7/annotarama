@@ -1,3 +1,4 @@
+import betterlytics from "@betterlytics/tracker";
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Toaster } from "@yusufceng1z/ding-react";
 import { useEffect } from "react";
@@ -48,6 +49,14 @@ const PhotoDraftCleanup = () => {
 };
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+	useEffect(() => {
+		if (APP_IS_DEVELOPMENT) return;
+		betterlytics.init("shanvit7-mwzbnwag", {
+			trackErrors: true,
+			trackConsoleErrors: true,
+		});
+	}, []);
+
 	return (
 		<html lang="en">
 			<head>

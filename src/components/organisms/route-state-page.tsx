@@ -1,7 +1,8 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { APP_FAVICON_URL } from "@/lib/constants";
+import { logger } from "@/lib/logger";
 
 type RouteStatePageProps = {
 	code: string;
@@ -65,24 +66,30 @@ export const RouteNotFoundPage = () => (
 	</RouteStatePage>
 );
 
-export const RouteErrorPage = ({ reset }: ErrorComponentProps) => (
-	<RouteStatePage
-		code="Error"
-		title="We couldn’t load this page."
-		description="Try again. If the problem continues, return to Annotarama."
-	>
-		<button
-			type="button"
-			className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full bg-primary px-6 font-semibold text-surface transition-colors duration-200 hover:bg-primary-hover motion-reduce:transition-none"
-			onClick={reset}
+export const RouteErrorPage = ({ error, reset }: ErrorComponentProps) => {
+	useEffect(() => {
+		logger.error("Route error", error);
+	}, [error]);
+
+	return (
+		<RouteStatePage
+			code="Error"
+			title="We couldn’t load this page."
+			description="Try again. If the problem continues, return to Annotarama."
 		>
-			Try again
-		</button>
-		<Link
-			to="/"
-			className="inline-flex min-h-12 items-center justify-center rounded-full border border-border px-6 font-semibold text-secondary transition-colors duration-200 hover:bg-primary-light motion-reduce:transition-none"
-		>
-			Go to homepage
-		</Link>
-	</RouteStatePage>
-);
+			<button
+				type="button"
+				className="inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full bg-primary px-6 font-semibold text-surface transition-colors duration-200 hover:bg-primary-hover motion-reduce:transition-none"
+				onClick={reset}
+			>
+				Try again
+			</button>
+			<Link
+				to="/"
+				className="inline-flex min-h-12 items-center justify-center rounded-full border border-border px-6 font-semibold text-secondary transition-colors duration-200 hover:bg-primary-light motion-reduce:transition-none"
+			>
+				Go to homepage
+			</Link>
+		</RouteStatePage>
+	);
+};

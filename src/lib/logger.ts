@@ -12,7 +12,7 @@ export const logger = {
 		if (LOGGING_ENABLED) console.warn(...args);
 	},
 	error: (...args: unknown[]) => {
-		if (LOGGING_ENABLED) console.error(...args);
+		console.error(...args);
 	},
 	debug: (...args: unknown[]) => {
 		if (LOGGING_ENABLED) console.debug(...args);

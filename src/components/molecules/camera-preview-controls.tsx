@@ -15,6 +15,9 @@ type CameraPreviewControlsProps = {
 	torchEnabled: boolean;
 	onStart: () => void;
 	onCapture: () => void;
+	isReviewingPhoto: boolean;
+	onRetake: () => void;
+	onContinueToAnnotate: () => void;
 	onSwitchCamera: () => void;
 	onStop: () => void;
 	onTorch: () => void;
@@ -133,8 +136,35 @@ const LiveCameraButtons = ({
 	</div>
 );
 
+const PhotoReviewButtons = ({
+	onRetake,
+	onContinueToAnnotate,
+}: Pick<CameraPreviewControlsProps, "onRetake" | "onContinueToAnnotate">) => (
+	<div className="absolute inset-x-0 bottom-3 z-10 flex justify-center px-3">
+		<div className="inline-flex items-center gap-2 rounded-full bg-secondary/85 p-2 text-surface">
+			<button
+				type="button"
+				onClick={onRetake}
+				className="min-h-12 cursor-pointer rounded-full border border-surface/30 px-4 text-sm font-medium text-surface transition-colors hover:bg-surface/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+			>
+				Retake photo
+			</button>
+			<button
+				type="button"
+				onClick={onContinueToAnnotate}
+				className="min-h-12 cursor-pointer rounded-full bg-primary px-4 text-sm font-semibold text-surface transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+			>
+				Continue to annotate
+			</button>
+		</div>
+	</div>
+);
+
 export const CameraPreviewControls = ({
 	status,
+	isReviewingPhoto,
+	onRetake,
+	onContinueToAnnotate,
 	canSwitchCamera,
 	torchSupported,
 	torchEnabled,
@@ -144,7 +174,14 @@ export const CameraPreviewControls = ({
 	onStop,
 	onTorch,
 }: CameraPreviewControlsProps) => {
-	if (status === "captured") return null;
+	if (status === "captured") {
+		return isReviewingPhoto ? (
+			<PhotoReviewButtons
+				onRetake={onRetake}
+				onContinueToAnnotate={onContinueToAnnotate}
+			/>
+		) : null;
+	}
 	if (status === "capturing") return <CapturingOverlay />;
 	if (status !== "live") {
 		return <CameraStartPrompt status={status} onStart={onStart} />;

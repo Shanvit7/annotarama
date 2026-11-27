@@ -1,4 +1,10 @@
 export type QualityStatus = "good" | "warning" | "poor" | "unknown";
+export type PhotoAssessment = {
+	resolution: QualityStatus;
+	fileSize: QualityStatus;
+	overall: QualityStatus;
+	advice: string | null;
+};
 type LightingDirection = "dark" | "bright" | "mixed" | "balanced" | "unknown";
 export type PixelMetrics = {
 	meanLuma: number;
@@ -107,6 +113,53 @@ export const meanAbsoluteDifference = (
 	for (let i = 0; i < current.length; i++)
 		total += Math.abs(current[i] - previous[i]);
 	return total / current.length;
+};
+
+export const assessPhoto = ({
+	width,
+	height,
+	bytes,
+}: {
+	width: number;
+	height: number;
+	bytes: number;
+}): PhotoAssessment => {
+	if (
+		!Number.isFinite(width) ||
+		!Number.isFinite(height) ||
+		!Number.isFinite(bytes) ||
+		width <= 0 ||
+		height <= 0 ||
+		bytes < 0
+	) {
+		return {
+			resolution: "unknown",
+			fileSize: "unknown",
+			overall: "unknown",
+			advice: "Photo details could not be checked.",
+		};
+	}
+
+	const megapixels = (width * height) / 1_000_000;
+	const resolution =
+		megapixels < 1 ? "poor" : megapixels < 2 ? "warning" : "good";
+	const fileSize = bytes < 100_000 ? "warning" : "good";
+	const overall =
+		resolution === "poor"
+			? "poor"
+			: resolution === "warning" || fileSize === "warning"
+				? "warning"
+				: "good";
+	const advice =
+		resolution === "poor"
+			? "Low resolution — use a higher-resolution camera for more detail."
+			: resolution === "warning"
+				? "Resolution is limited — retake if you need fine detail."
+				: fileSize === "warning"
+					? "File is unusually small — check image detail before annotating."
+					: null;
+
+	return { resolution, fileSize, overall, advice };
 };
 
 export const overallStatus = (checks: QualityChecks): QualityStatus => {
