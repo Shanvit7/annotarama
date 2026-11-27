@@ -25,8 +25,10 @@ const Home = () => {
 							className="m-0 text-[length:clamp(2.5rem,11vw,3.75rem)] font-semibold leading-[1.04] tracking-[-0.03em] text-balance lg:text-heading-3 xl:text-heading-2"
 							id="hero-title"
 						>
-							<span className="hero-title-gradient block">Mark what</span>
-							<span className="hero-highlight inline-block px-[0.1em] py-[0.02em] text-ink italic [box-decoration-break:clone]">
+							<span className="bg-[linear-gradient(180deg,var(--color-primary),var(--color-indigo-dark)_61%,var(--color-indigo-darker))] bg-clip-text text-transparent [-webkit-text-fill-color:transparent] block">
+								Mark what
+							</span>
+							<span className="inline-block [background-image:linear-gradient(var(--color-accent),var(--color-accent))] [background-position:left_bottom] bg-no-repeat [background-size:100%_0%] animate-[hero-highlight-paint_900ms_cubic-bezier(0.16,1,0.3,1)_350ms_forwards] motion-reduce:[animation-delay:0ms] px-[0.1em] py-[0.02em] text-ink italic [box-decoration-break:clone]">
 								needs attention.
 							</span>
 						</h1>

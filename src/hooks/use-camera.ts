@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { logger } from "../lib/logger.ts";
 
 export type CameraStatus =
 	| "idle"
@@ -166,6 +167,7 @@ export const useCamera = () => {
 				});
 			} catch (cameraError) {
 				if (requestId !== requestIdRef.current) return;
+				logger.warn("Camera access failed", cameraError);
 				setError(mapCameraError(cameraError));
 				setStatus("error");
 				return;
@@ -197,8 +199,9 @@ export const useCamera = () => {
 
 			try {
 				await video.play();
-			} catch {
+			} catch (previewError) {
 				if (requestId !== requestIdRef.current) return;
+				logger.error("Camera preview failed", previewError);
 				releaseStream();
 				setError(
 					createCameraError(
@@ -243,15 +246,28 @@ export const useCamera = () => {
 				setCameraIds(ids);
 				const index = ids.indexOf(activeCameraId ?? "");
 				setActiveCameraIndex(index < 0 ? 0 : index);
-			} catch {
+			} catch (enumerateError) {
 				if (requestId !== requestIdRef.current) {
 					stopTracks(stream);
 					return;
 				}
+				logger.warn("Could not enumerate cameras", enumerateError);
 				setCameraIds([]);
 				setActiveCameraIndex(0);
 			}
 			setStatus("live");
+		},
+		[releaseStream],
+	);
+
+	const restorePhoto = useCallback(
+		(restoredPhoto: CapturedPhoto) => {
+			requestIdRef.current += 1;
+			releaseStream();
+			photoRef.current = restoredPhoto;
+			setPhoto(restoredPhoto);
+			setError(null);
+			setStatus("captured");
 		},
 		[releaseStream],
 	);
@@ -302,7 +318,8 @@ export const useCamera = () => {
 			setError(null);
 			setStatus("captured");
 			return capturedPhoto;
-		} catch {
+		} catch (captureError) {
+			logger.error("Photo capture failed", captureError);
 			setError(
 				createCameraError(
 					"capture-failed",
@@ -333,7 +350,8 @@ export const useCamera = () => {
 			capabilities = track?.getCapabilities?.() as
 				| TorchCapabilities
 				| undefined;
-		} catch {
+		} catch (capabilityError) {
+			logger.warn("Could not read torch capability", capabilityError);
 			setTorchSupported(false);
 			setTorchEnabled(false);
 			setError(
@@ -364,7 +382,8 @@ export const useCamera = () => {
 			setTorchEnabled(actualTorchState);
 			setError(null);
 			return actualTorchState;
-		} catch {
+		} catch (torchError) {
+			logger.warn("Could not change torch state", torchError);
 			try {
 				setTorchEnabled(track.getSettings().torch ?? false);
 			} catch {
@@ -401,6 +420,7 @@ export const useCamera = () => {
 		switchCamera,
 		stopCamera,
 		capturePhoto,
+		restorePhoto,
 		retakePhoto,
 		setTorch,
 	};

@@ -7,10 +7,15 @@ import {
 	useSelection,
 } from "@annotorious/react";
 import "@annotorious/react/annotorious-react.css";
-import type { PopupProps } from "@annotorious/react";
+import type {
+	Annotator,
+	ImageAnnotation,
+	PopupProps,
+} from "@annotorious/react";
 import { ArrowUp, PanelRightOpen, ScanSearch, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnnotationDeleteConfirmation } from "@/components/molecules/annotation-delete-confirmation";
 import {
 	Sheet,
 	SheetClose,
@@ -19,6 +24,9 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "@/components/ui/sheet";
+import { logger } from "@/lib/logger";
+import type { PhotoDraftStatus } from "@/lib/photo-drafts";
+import { savePhotoAnnotations } from "@/lib/photo-drafts";
 
 const AnnotationLabelForm = ({
 	annotation,
@@ -39,7 +47,12 @@ const AnnotationLabelForm = ({
 			)
 			?.focus({ preventScroll: true });
 	};
-	const deleteAnnotation = () => {
+	const deleteAnnotation = async () => {
+		const confirmed = await AnnotationDeleteConfirmation.call({
+			label: body?.value,
+		});
+		if (!confirmed) return;
+
 		const current = document.querySelector<HTMLButtonElement>(
 			`[data-annotation-id="${CSS.escape(annotation.id)}"]`,
 		);
@@ -102,8 +115,13 @@ const AnnotationLabelForm = ({
 				aria-invalid={showError}
 				aria-describedby={showError ? errorId : undefined}
 				onChange={(event) => {
-					setValue(event.currentTarget.value);
-					if (event.currentTarget.value.trim()) setShowError(false);
+					const nextValue = event.currentTarget.value;
+					setValue(nextValue);
+					if (body) onUpdateBody(body, { ...body, value: nextValue });
+					else if (nextValue) {
+						onCreateBody({ purpose: "commenting", value: nextValue });
+					}
+					if (nextValue.trim()) setShowError(false);
 				}}
 				onKeyDown={(event) => {
 					if (event.key === "Escape") {
@@ -145,7 +163,7 @@ const AnnotationLabelForm = ({
 	);
 };
 
-const AnnotationList = () => {
+const AnnotationList = ({ draftStatus }: { draftStatus: PhotoDraftStatus }) => {
 	const annotator = useAnnotator();
 	const annotations = useAnnotations();
 	const { selected } = useSelection();
@@ -184,6 +202,16 @@ const AnnotationList = () => {
 					</button>
 				</SheetClose>
 			</div>
+			<p
+				aria-live="polite"
+				className={`m-0 px-3 pt-2 text-tiny ${draftStatus === "error" ? "text-error" : "text-neutral-dark"}`}
+			>
+				{draftStatus === "saving"
+					? "Saving changes…"
+					: draftStatus === "error"
+						? "Changes could not be saved on this tab."
+						: "Changes saved on this tab."}
+			</p>
 			{annotations.length === 0 ? (
 				<p className="m-0 px-3 py-4 text-sm leading-5 text-neutral-dark">
 					Draw a box, then add a label.
@@ -220,7 +248,33 @@ const AnnotationList = () => {
 								</button>
 								<button
 									type="button"
-									onClick={() => annotator?.removeAnnotation(annotation.id)}
+									onClick={async () => {
+										const confirmed = await AnnotationDeleteConfirmation.call({
+											label,
+										});
+										if (!confirmed) return;
+
+										const row = document
+											.querySelector<HTMLButtonElement>(
+												`[data-annotation-id="${CSS.escape(annotation.id)}"]`,
+											)
+											?.closest("li");
+										const target =
+											row?.nextElementSibling?.querySelector<HTMLButtonElement>(
+												"[data-annotation-id]",
+											) ??
+											row?.previousElementSibling?.querySelector<HTMLButtonElement>(
+												"[data-annotation-id]",
+											) ??
+											document.querySelector<HTMLHeadingElement>(
+												"[data-annotations-heading]",
+											);
+
+										annotator?.removeAnnotation(annotation.id);
+										requestAnimationFrame(() =>
+											target?.focus({ preventScroll: true }),
+										);
+									}}
 									aria-label={`Delete annotation ${index + 1}${label ? `: ${label}` : ""}`}
 									className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-md text-neutral-dark transition-colors hover:bg-error-light hover:text-error focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
 								>
@@ -239,6 +293,10 @@ type ImageAnnotationEditorProps = {
 	imageUrl: string;
 	imageWidth: number;
 	imageHeight: number;
+	draftId: string | null;
+	initialAnnotations: ImageAnnotation[];
+	draftStatus: PhotoDraftStatus;
+	setDraftStatus: (status: PhotoDraftStatus) => void;
 	annotationSheetContainer: HTMLElement;
 };
 
@@ -278,7 +336,11 @@ const AnnotationNumberMarkers = ({
 
 const AnnotationSidebar = ({
 	annotationSheetContainer,
-}: Pick<ImageAnnotationEditorProps, "annotationSheetContainer">) => {
+	draftStatus,
+}: Pick<
+	ImageAnnotationEditorProps,
+	"annotationSheetContainer" | "draftStatus"
+>) => {
 	const annotations = useAnnotations();
 
 	return (
@@ -306,20 +368,73 @@ const AnnotationSidebar = ({
 				portalContainer={annotationSheetContainer}
 				className="h-full overflow-hidden p-0 [@media(max-height:34rem)_and_(min-width:40rem)]:!w-72"
 			>
-				<AnnotationList />
+				<AnnotationList draftStatus={draftStatus} />
 			</SheetContent>
 		</Sheet>
 	);
+};
+
+const AnnotationDraftSync = ({
+	draftId,
+	initialAnnotations,
+	setDraftStatus,
+}: {
+	draftId: string;
+	initialAnnotations: ImageAnnotation[];
+	setDraftStatus: (status: PhotoDraftStatus) => void;
+}) => {
+	const annotator = useAnnotator<Annotator<ImageAnnotation, ImageAnnotation>>();
+	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		annotator.setAnnotations(initialAnnotations, true);
+
+		const save = () => {
+			if (timer.current) clearTimeout(timer.current);
+			timer.current = null;
+			void savePhotoAnnotations(draftId, annotator.getAnnotations())
+				.then(() => setDraftStatus("saved"))
+				.catch((error: unknown) => {
+					logger.error("Could not save photo annotations", error);
+					setDraftStatus("error");
+				});
+		};
+		const scheduleSave = () => {
+			if (timer.current) clearTimeout(timer.current);
+			setDraftStatus("saving");
+			timer.current = setTimeout(save, 250);
+		};
+
+		annotator.on("createAnnotation", scheduleSave);
+		annotator.on("updateAnnotation", scheduleSave);
+		annotator.on("deleteAnnotation", scheduleSave);
+		window.addEventListener("pagehide", save);
+
+		return () => {
+			if (timer.current) clearTimeout(timer.current);
+			annotator.off("createAnnotation", scheduleSave);
+			annotator.off("updateAnnotation", scheduleSave);
+			annotator.off("deleteAnnotation", scheduleSave);
+			window.removeEventListener("pagehide", save);
+		};
+	}, [annotator, draftId, initialAnnotations, setDraftStatus]);
+
+	return null;
 };
 
 const ImageAnnotationEditor = ({
 	imageUrl,
 	imageWidth,
 	imageHeight,
+	draftId,
+	initialAnnotations,
+	draftStatus,
+	setDraftStatus,
 	annotationSheetContainer,
 }: ImageAnnotationEditorProps) => {
 	return (
 		<Annotorious>
+			<AnnotationDeleteConfirmation />
 			<div className="relative min-h-0 min-w-0 flex-1">
 				<div className="flex size-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg [container-type:size]">
 					<div
@@ -347,9 +462,17 @@ const ImageAnnotationEditor = ({
 							imageHeight={imageHeight}
 						/>
 					</div>
+					{draftId && (
+						<AnnotationDraftSync
+							draftId={draftId}
+							initialAnnotations={initialAnnotations}
+							setDraftStatus={setDraftStatus}
+						/>
+					)}
 				</div>
 				<AnnotationSidebar
 					annotationSheetContainer={annotationSheetContainer}
+					draftStatus={draftStatus}
 				/>
 			</div>
 			{createPortal(

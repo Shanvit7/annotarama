@@ -1,6 +1,8 @@
+import type { ImageAnnotation } from "@annotorious/react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "@yusufceng1z/ding-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { AsciiFlowBackdrop } from "@/components/atoms/ascii-flow-backdrop";
 import { CameraPreviewControls } from "@/components/molecules/camera-preview-controls";
 import {
 	CameraLiveQuality,
@@ -11,104 +13,19 @@ import { useCamera } from "@/hooks/use-camera";
 import { useLiveImageQuality } from "@/hooks/use-live-image-quality";
 import { APP_FAVICON_URL } from "@/lib/constants";
 import type { LiveQuality } from "@/lib/image-quality";
+import { logger } from "@/lib/logger";
+import {
+	deletePhotoDraft,
+	getOrCreatePhotoSessionId,
+	loadPhotoDraft,
+	savePhotoDraft,
+} from "@/lib/photo-drafts";
 
 const formatFileSize = (bytes: number) => {
 	const isMegabytes = bytes >= 1_000_000;
 	const unitSize = isMegabytes ? 1_000_000 : 1_000;
 	const unit = isMegabytes ? "MB" : "KB";
 	return `${(bytes / unitSize).toFixed(isMegabytes ? 1 : 0)} ${unit}`;
-};
-
-const AsciiFlowBackdrop = () => {
-	const canvasRef = useRef<HTMLCanvasElement>(null);
-
-	useEffect(() => {
-		const canvas = canvasRef.current;
-		const context = canvas?.getContext("2d");
-		if (!canvas || !context) return;
-
-		const rootStyles = getComputedStyle(document.documentElement);
-		const colors = [
-			"--color-accent",
-			"--color-frost",
-			"--color-indigo-light",
-		].map((token) => rootStyles.getPropertyValue(token).trim());
-		const reducedMotion = matchMedia(
-			"(prefers-reduced-motion: reduce)",
-		).matches;
-		let width = 0;
-		let height = 0;
-		let animationFrame = 0;
-		let lastFrame = 0;
-
-		const draw = (time: number) => {
-			const cellWidth = 8;
-			const cellHeight = 12;
-			const columns = Math.ceil(width / cellWidth);
-			const rows = Math.ceil(height / cellHeight);
-			const phase = ((time % 8000) / 8000) * Math.PI * 2;
-			context.clearRect(0, 0, width, height);
-			context.font = `${cellHeight}px monospace`;
-
-			for (let row = 0; row < rows; row += 1) {
-				for (let column = 0; column < columns; column += 1) {
-					const x = column / columns;
-					const y = row / rows;
-					const flow =
-						(Math.sin(x * 8 + phase + Math.sin(y * 5 - phase)) +
-							Math.cos(y * 10 - phase + x * 3) +
-							Math.sin((x + y) * 12 - phase * 2)) /
-						3;
-					const density = (flow + 1) / 2;
-					if (density < 0.22) continue;
-
-					context.globalAlpha = 0.22 + density * 0.38;
-					context.fillStyle =
-						colors[(column + row + Math.floor(density * 3)) % colors.length];
-					const glyphs = " .:-=+*#%@";
-					const glyph =
-						glyphs[
-							Math.min(glyphs.length - 1, Math.floor(density * glyphs.length))
-						];
-					context.fillText(glyph, column * cellWidth, row * cellHeight);
-				}
-			}
-		};
-
-		const animate = (time: number) => {
-			if (time - lastFrame >= 1000 / 30 && !document.hidden) {
-				lastFrame = time;
-				draw(time);
-			}
-			animationFrame = requestAnimationFrame(animate);
-		};
-
-		const resize = () => {
-			const bounds = canvas.getBoundingClientRect();
-			const scale = Math.min(window.devicePixelRatio || 1, 1.5);
-			width = bounds.width;
-			height = bounds.height;
-			canvas.width = Math.floor(width * scale);
-			canvas.height = Math.floor(height * scale);
-			context.setTransform(scale, 0, 0, scale, 0, 0);
-			draw(reducedMotion ? 0 : performance.now());
-		};
-		const observer = new ResizeObserver(resize);
-		observer.observe(canvas);
-		resize();
-		if (!reducedMotion) animationFrame = requestAnimationFrame(animate);
-
-		return () => {
-			observer.disconnect();
-			cancelAnimationFrame(animationFrame);
-		};
-	}, []);
-
-	return (
-		<div aria-hidden="true" className="pointer-events-none absolute inset-0">
-			<canvas ref={canvasRef} className="size-full" />
-		</div>
-	);
 };
 
 type CaptureWorkspaceProps = {
@@ -119,6 +36,11 @@ type CaptureWorkspaceProps = {
 	qualityAtCapture: LiveQuality | null;
 	liveBorderClass: string;
 	photoUrl: string | null;
+	draftId: string | null;
+	initialAnnotations: ImageAnnotation[];
+	isPhotoSaving: boolean;
+	draftStatus: "saving" | "saved" | "error";
+	setDraftStatus: (status: "saving" | "saved" | "error") => void;
 	annotationSheetContainer: HTMLElement | null;
 	setAnnotationSheetContainer: (container: HTMLElement | null) => void;
 	onCapture: () => void;
@@ -175,20 +97,43 @@ const CapturedPhotoPreview = ({
 	isCaptured,
 	photo,
 	photoUrl,
+	draftId,
+	initialAnnotations,
+	isPhotoSaving,
+	draftStatus,
+	setDraftStatus,
 	annotationSheetContainer,
 }: Pick<
 	CaptureWorkspaceProps,
-	"isCaptured" | "photoUrl" | "annotationSheetContainer"
+	| "isCaptured"
+	| "photoUrl"
+	| "draftId"
+	| "initialAnnotations"
+	| "isPhotoSaving"
+	| "draftStatus"
+	| "setDraftStatus"
+	| "annotationSheetContainer"
 > & {
 	photo: ReturnType<typeof useCamera>["photo"];
 }) => {
 	if (!isCaptured) return null;
+	if (isPhotoSaving) {
+		return (
+			<p className="absolute inset-0 z-10 m-0 grid place-content-center p-4 text-regular leading-relaxed text-white/90">
+				Saving photo for this tab…
+			</p>
+		);
+	}
 	if (photoUrl && annotationSheetContainer && photo) {
 		return (
 			<ImageAnnotationEditor
 				imageUrl={photoUrl}
 				imageWidth={photo.width}
 				imageHeight={photo.height}
+				draftId={draftId}
+				initialAnnotations={initialAnnotations}
+				draftStatus={draftStatus}
+				setDraftStatus={setDraftStatus}
 				annotationSheetContainer={annotationSheetContainer}
 			/>
 		);
@@ -214,6 +159,11 @@ const CapturePreviewFrame = ({
 	liveQuality,
 	liveBorderClass,
 	photoUrl,
+	draftId,
+	initialAnnotations,
+	isPhotoSaving,
+	draftStatus,
+	setDraftStatus,
 	annotationSheetContainer,
 	onCapture,
 }: CaptureWorkspaceProps) => {
@@ -243,6 +193,11 @@ const CapturePreviewFrame = ({
 				isCaptured={isCaptured}
 				photo={photo}
 				photoUrl={photoUrl}
+				draftId={draftId}
+				initialAnnotations={initialAnnotations}
+				isPhotoSaving={isPhotoSaving}
+				draftStatus={draftStatus}
+				setDraftStatus={setDraftStatus}
 				annotationSheetContainer={annotationSheetContainer}
 			/>
 			<CameraPreviewControls
@@ -305,7 +260,23 @@ const CaptureWorkspace = (props: CaptureWorkspaceProps) => {
 
 const CameraCapture = () => {
 	const camera = useCamera();
-	const { videoRef, status, error, photo, capturePhoto, retakePhoto } = camera;
+	const {
+		videoRef,
+		status,
+		error,
+		photo,
+		capturePhoto,
+		restorePhoto,
+		retakePhoto,
+	} = camera;
+	const [draftId, setDraftId] = useState<string | null>(null);
+	const [initialAnnotations, setInitialAnnotations] = useState<
+		ImageAnnotation[]
+	>([]);
+	const [draftStatus, setDraftStatus] = useState<"saving" | "saved" | "error">(
+		"saved",
+	);
+	const [isPhotoSaving, setIsPhotoSaving] = useState(false);
 	const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 	const [annotationSheetContainer, setAnnotationSheetContainer] =
 		useState<HTMLElement | null>(null);
@@ -316,14 +287,82 @@ const CameraCapture = () => {
 	const isCaptured = status === "captured" && photo !== null;
 	const liveQuality = useLiveImageQuality(videoRef, isLive);
 	const liveBorderClass = getLiveBorderClass(liveQuality);
-	const handleCapture = () => {
+	const handleCapture = async () => {
 		setQualityAtCapture(liveQuality);
-		void capturePhoto();
+		setIsPhotoSaving(Boolean(draftId));
+		setDraftStatus(draftId ? "saving" : "error");
+		const capturedPhoto = await capturePhoto();
+		if (!capturedPhoto) {
+			setIsPhotoSaving(false);
+			setDraftStatus("saved");
+			return;
+		}
+		if (!draftId) return;
+
+		try {
+			await savePhotoDraft(draftId, capturedPhoto, liveQuality);
+			setIsPhotoSaving(false);
+			setInitialAnnotations([]);
+			setDraftStatus("saved");
+		} catch (saveError) {
+			logger.error("Could not save captured photo for this tab", saveError);
+			setIsPhotoSaving(false);
+			setDraftStatus("error");
+			toast.error("This photo could not be saved for this tab.");
+		}
 	};
-	const handleRetake = () => {
+	const handleRetake = async () => {
 		setQualityAtCapture(null);
-		void retakePhoto();
+		setInitialAnnotations([]);
+		setIsPhotoSaving(false);
+		if (draftId) {
+			try {
+				await deletePhotoDraft(draftId);
+				setDraftStatus("saved");
+			} catch (deleteError) {
+				logger.error("Could not clear this tab's photo data", deleteError);
+				setDraftStatus("error");
+			}
+		}
+		await retakePhoto();
 	};
+
+	useEffect(() => {
+		let ignore = false;
+		const id = getOrCreatePhotoSessionId();
+		setDraftId(id);
+		if (!id) {
+			setDraftStatus("error");
+			return () => {
+				ignore = true;
+			};
+		}
+
+		void loadPhotoDraft(id).then(
+			(draft) => {
+				if (ignore) return;
+				if (draft) {
+					setInitialAnnotations(draft.annotations);
+					setQualityAtCapture(draft.qualityAtCapture);
+					restorePhoto({
+						blob: draft.blob,
+						width: draft.width,
+						height: draft.height,
+					});
+				}
+				setDraftStatus("saved");
+			},
+			(restoreError: unknown) => {
+				if (ignore) return;
+				logger.error("Could not restore this tab's photo data", restoreError);
+				setDraftStatus("error");
+			},
+		);
+
+		return () => {
+			ignore = true;
+		};
+	}, [restorePhoto]);
 
 	useEffect(() => {
 		if (!photo) return;
@@ -370,6 +409,11 @@ const CameraCapture = () => {
 					qualityAtCapture={qualityAtCapture}
 					liveBorderClass={liveBorderClass}
 					photoUrl={photoUrl}
+					draftId={draftId}
+					initialAnnotations={initialAnnotations}
+					isPhotoSaving={isPhotoSaving}
+					draftStatus={draftStatus}
+					setDraftStatus={setDraftStatus}
 					annotationSheetContainer={annotationSheetContainer}
 					setAnnotationSheetContainer={setAnnotationSheetContainer}
 					onCapture={handleCapture}

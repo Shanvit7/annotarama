@@ -6,7 +6,7 @@
 
 Annotarama is a React app for capturing images with a device camera, assessing image quality, and creating editable, labeled bounding-box annotations. The target experience is responsive across desktop, tablet, and mobile. See [`docs/OBJECTIVES.md`](docs/OBJECTIVES.md) for product objectives and requirements, and [`DESIGN.md`](DESIGN.md) for the Loopr AI-inspired visual system.
 
-> **Status:** camera capture, advisory live-preview quality checks, camera switching, and bounding-box annotation editing are implemented. Annotation data stays in memory; captured-image quality assessment and persistence are not implemented. See [live camera quality notes](docs/live-camera-quality.md) for thresholds, checks, and device-testing limits.
+> **Status:** camera capture, advisory live-preview quality checks, camera switching, torch control where supported, rectangular annotation editing, and per-tab local photo/annotation restore are implemented. Quality thresholds remain experimental; real-device calibration and persistence-path tests remain outstanding. See [camera quality notes](docs/live-camera-quality.md) and [annotation editor notes](docs/annotation-editor.md).
 
 ## Stack
 
@@ -46,14 +46,15 @@ After enabling **Settings → Pages → GitHub Actions** in the repository, push
 1. Request camera access and show a live preview.
 2. Switch between available cameras; expose torch control only when supported.
 3. Capture, review, or retake an image; show resolution, file size, and advisory live quality.
-4. Draw, select, move, resize, label, and delete bounding boxes.
-5. Keep annotations aligned as the displayed image resizes; support touch and keyboard interaction.
+4. Draw, select, move, resize, label, and delete bounding boxes; view them in the annotation list.
+5. Keep annotations aligned as the displayed image resizes; support touch interaction on mobile and tablets.
 
-## Current decisions
+## Technical notes
 
-- **Vite** is the TanStack Start build tool. Its standard plugin path is already working; Rsbuild is not justified without a measured build-time need. See [`docs/adr/0001-vite-build-tool.md`](docs/adr/0001-vite-build-tool.md).
+- **Camera and quality:** requests an ideal 3840×2160 preview, then captures at the dimensions actually supplied by the browser. Quality checks are advisory live-preview estimates, not analysis of the saved still; thresholds are experimental. See [`docs/live-camera-quality.md`](docs/live-camera-quality.md).
+- **Annotations and session storage:** `@annotorious/react` manages rectangles; Dexie/IndexedDB stores the photo and its annotation geometry/labels for the current tab. Same-tab refresh restores them; tab-close cleanup is queued for the next visit to this origin. Storage is local, temporary, and not synced or exported. See [`docs/annotation-editor.md`](docs/annotation-editor.md).
+- **Vite** is the TanStack Start build tool; see [`docs/adr/0001-vite-build-tool.md`](docs/adr/0001-vite-build-tool.md).
 - **Loopr AI** is a visual reference, not a template to copy. Reuse the palette, typography, and spacing documented in [`DESIGN.md`](DESIGN.md), while keeping Annotarama's own logo and product UI original.
-- **No backend or persistence layer is selected.** Core capture and annotation can run in the browser; decide storage/export when product needs are clear.
 
 ## Project layout
 
@@ -63,6 +64,6 @@ After enabling **Settings → Pages → GitHub Actions** in the repository, push
 - `docs/OBJECTIVES.md` — product objectives and success criteria
 - `docs/adr/` — durable technical decisions
 
-## Known limitations
+## Demo and known limitations
 
-Live quality thresholds are experimental and need physical-device calibration. Camera and torch capabilities vary by browser and device; unsupported features are detected in the UI. Quality estimates describe the live preview, not the captured still. Annotation data is in memory only and is cleared on retake or leaving capture. Persistence and demo deployment are not implemented.
+For a running demonstration, start `pnpm dev`, open `/capture` on `localhost`, and walk through camera permission, quality feedback, capture, rectangle labeling/editing, same-tab refresh restore, and retake. No recorded video or public demo URL is included. Camera access on deployed sites requires a secure context. Camera and torch behavior varies by browser/device; physical-device checks remain outstanding. Quality thresholds need calibration with representative photos. Per-tab storage cleanup is best-effort and runs on the next visit to this origin; there is no export, permanent archive, or server sync.

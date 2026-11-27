@@ -31,18 +31,20 @@ Annotarama helps people capture images with a device camera and annotate them in
 - Draw rectangular bounding boxes on captured images.
 - Select, move, resize, label, and delete annotations.
 - Keep annotations aligned with their image when it is resized.
+- Automatically save the photo and its annotation geometry and labels locally; restore them after refresh in the same tab.
+- Queue per-tab data cleanup when its tab closes and perform cleanup on the next visit to this origin; expire stale records as a fallback.
 - Provide a clear way to view and manage all annotations.
 
 ### Responsive experience
 
 - Support desktop, tablet, and mobile layouts, including touch interaction.
-- Keep capture-to-annotation flow clear, with visible feedback for actions and errors.
-- Prioritize accessibility and usable controls across input modes.
+- Keep the capture-to-annotation flow clear, with visible feedback for actions and errors.
 
 ## Success criteria
 
 - Camera and capture work across supported browsers, with graceful permission and capability handling.
 - Image quality information and thresholds are visible and useful.
 - Annotation editing is accurate, and annotations remain aligned at different display sizes.
+- Refreshing the same tab restores its captured photo and annotations; closed-tab data is cleaned on the next origin visit or by stale-record expiry.
 - Core workflows are understandable and usable on desktop and touch devices.
 - Setup, implementation choices, limitations, and meaningful tests are documented.

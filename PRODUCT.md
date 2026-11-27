@@ -26,7 +26,8 @@ The app is intended for desktop, tablet, and mobile use. Manufacturing-floor wor
 
 - Implemented: live camera preview, capture/preview/retake, switching between available cameras, practical maximum resolution, quality feedback, and torch control where supported.
 - Implemented: draw, select, move, resize, label, and delete rectangular annotations; marks stay aligned when image display size changes.
-- Annotation data is in-memory only. Retaking or leaving capture clears annotations; persistence and export are not implemented.
+- Captured photos and their rectangular annotations (including labels) are saved locally in IndexedDB for the current browser tab and restored after refresh. No account or server sync is used.
+- Closing a tab queues its saved data for deletion on the next visit to this origin; cleanup is best-effort because browsers may interrupt page-close work. Stale records are also removed after 30 days. Retaking explicitly clears the current photo and annotations; export is not implemented.
 - The app is open to use without authentication.
 - Landing-page copy must be plain and useful, with no invented product claims.
 

@@ -1,10 +1,16 @@
+import type { ImageAnnotation } from "@annotorious/react";
 import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
+import type { PhotoDraftStatus } from "@/lib/photo-drafts";
 
 type ImageAnnotationEditorProps = {
 	imageUrl: string;
 	imageWidth: number;
 	imageHeight: number;
+	draftId: string | null;
+	initialAnnotations: ImageAnnotation[];
+	draftStatus: PhotoDraftStatus;
+	setDraftStatus: (status: PhotoDraftStatus) => void;
 	annotationSheetContainer: HTMLElement;
 };
 
