@@ -49,26 +49,36 @@ type IndicatorProps = {
 	torchEnabled: boolean;
 };
 
+const getStatusPresentation = (quality: LiveQuality) => {
+	if (quality.unavailable)
+		return { title: "Quality unavailable", Icon: Camera };
+	if (quality.overall === "poor" || quality.overall === "warning") {
+		return { title: "Adjust capture conditions", Icon: TriangleAlert };
+	}
+	if (quality.overall === "good") {
+		return { title: "Good capture conditions", Icon: CircleCheck };
+	}
+	return { title: "Checking conditions…", Icon: Camera };
+};
+
+const QualitySuggestion = ({
+	quality,
+	torchSupported,
+	torchEnabled,
+}: IndicatorProps) =>
+	!quality.unavailable &&
+	(quality.overall === "poor" || quality.overall === "warning") && (
+		<p className="m-0 text-xs leading-4 text-surface/90">
+			{qualitySuggestion(quality, torchSupported, torchEnabled)}
+		</p>
+	);
+
 const LiveQualityIndicator = ({
 	quality,
 	torchSupported,
 	torchEnabled,
 }: IndicatorProps) => {
-	const title = quality.unavailable
-		? "Quality unavailable"
-		: quality.overall === "poor" || quality.overall === "warning"
-			? "Adjust capture conditions"
-			: quality.overall === "good"
-				? "Good capture conditions"
-				: "Checking conditions…";
-	// Compact, translucent adaptation of Animata's Security Alert widget.
-	const StatusIcon = quality.unavailable
-		? Camera
-		: quality.overall === "good"
-			? CircleCheck
-			: quality.overall === "poor" || quality.overall === "warning"
-				? TriangleAlert
-				: Camera;
+	const { title, Icon: StatusIcon } = getStatusPresentation(quality);
 	const checks = [
 		{
 			label: "Focus",
@@ -114,12 +124,11 @@ const LiveQualityIndicator = ({
 						</div>
 					))}
 				</dl>
-				{!quality.unavailable &&
-					(quality.overall === "poor" || quality.overall === "warning") && (
-						<p className="m-0 text-xs leading-4 text-surface/90">
-							{qualitySuggestion(quality, torchSupported, torchEnabled)}
-						</p>
-					)}
+				<QualitySuggestion
+					quality={quality}
+					torchSupported={torchSupported}
+					torchEnabled={torchEnabled}
+				/>
 			</div>
 			<p className="sr-only">
 				Focus estimates sharpness, not autofocus. Stability estimates scene

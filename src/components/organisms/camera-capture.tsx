@@ -111,23 +111,201 @@ const AsciiFlowBackdrop = () => {
 	);
 };
 
-const CameraCapture = () => {
+type CaptureWorkspaceProps = {
+	camera: ReturnType<typeof useCamera>;
+	isLive: boolean;
+	isCaptured: boolean;
+	liveQuality: LiveQuality;
+	qualityAtCapture: LiveQuality | null;
+	liveBorderClass: string;
+	photoUrl: string | null;
+	annotationSheetContainer: HTMLElement | null;
+	setAnnotationSheetContainer: (container: HTMLElement | null) => void;
+	onCapture: () => void;
+	onRetake: () => void;
+};
+
+const getLiveBorderClass = (quality: LiveQuality) => {
+	if (quality.unavailable || quality.overall === "unknown") {
+		return "border-surface/50";
+	}
+	if (quality.overall === "good") return "border-success";
+	if (quality.overall === "warning") return "border-amber-400";
+	return "border-error";
+};
+
+const LiveQualityOverlay = ({
+	isLive,
+	quality,
+	torchSupported,
+	torchEnabled,
+}: {
+	isLive: boolean;
+	quality: LiveQuality;
+	torchSupported: boolean;
+	torchEnabled: boolean;
+}) => {
+	if (!isLive) return null;
+	if (quality.unavailable || quality.overall !== "good") {
+		return (
+			<CameraLiveQuality
+				quality={quality}
+				torchSupported={torchSupported}
+				torchEnabled={torchEnabled}
+			/>
+		);
+	}
+	return (
+		<p
+			aria-live="polite"
+			className="pointer-events-none absolute left-1/2 top-3 z-10 w-fit max-w-[calc(100%_-_1.5rem)] -translate-x-1/2 rounded-xl border border-success/40 bg-secondary/50 px-3 py-1.5 text-sm font-semibold text-surface shadow-sm backdrop-blur-sm"
+		>
+			Looks good — take the photo now.
+		</p>
+	);
+};
+
+const IdleCameraBackdrop = ({
+	isLive,
+	isCaptured,
+}: Pick<CaptureWorkspaceProps, "isLive" | "isCaptured">) =>
+	!isLive && !isCaptured ? <AsciiFlowBackdrop /> : null;
+
+const CapturedPhotoPreview = ({
+	isCaptured,
+	photo,
+	photoUrl,
+	annotationSheetContainer,
+}: Pick<
+	CaptureWorkspaceProps,
+	"isCaptured" | "photoUrl" | "annotationSheetContainer"
+> & {
+	photo: ReturnType<typeof useCamera>["photo"];
+}) => {
+	if (!isCaptured) return null;
+	if (photoUrl && annotationSheetContainer && photo) {
+		return (
+			<ImageAnnotationEditor
+				imageUrl={photoUrl}
+				imageWidth={photo.width}
+				imageHeight={photo.height}
+				annotationSheetContainer={annotationSheetContainer}
+			/>
+		);
+	}
+	return (
+		<p className="absolute inset-0 z-10 m-0 grid place-content-center p-4 text-regular leading-relaxed text-white/90 lg:text-base lg:leading-6">
+			Preparing photo preview…
+		</p>
+	);
+};
+
+const getPreviewFrameClass = (
+	isLive: boolean,
+	isCaptured: boolean,
+	liveBorderClass: string,
+) =>
+	`relative overflow-hidden rounded-2xl text-center ${isLive ? `h-full w-auto max-w-full aspect-video flex-none border-2 ${liveBorderClass} min-h-40` : "flex min-h-0 flex-1 flex-col"} ${isCaptured ? "bg-surface" : isLive ? "bg-transparent text-surface" : "bg-secondary text-surface"}`;
+
+const CapturePreviewFrame = ({
+	camera,
+	isLive,
+	isCaptured,
+	liveQuality,
+	liveBorderClass,
+	photoUrl,
+	annotationSheetContainer,
+	onCapture,
+}: CaptureWorkspaceProps) => {
+	const { photo, videoRef } = camera;
+
+	return (
+		<div className={getPreviewFrameClass(isLive, isCaptured, liveBorderClass)}>
+			<video
+				ref={videoRef}
+				autoPlay
+				muted
+				playsInline
+				aria-label="Live camera preview"
+				aria-hidden={!isLive}
+				className={
+					isLive ? "absolute inset-0 size-full object-cover" : "hidden"
+				}
+			/>
+			<LiveQualityOverlay
+				isLive={isLive}
+				quality={liveQuality}
+				torchSupported={camera.torchSupported}
+				torchEnabled={camera.torchEnabled}
+			/>
+			<IdleCameraBackdrop isLive={isLive} isCaptured={isCaptured} />
+			<CapturedPhotoPreview
+				isCaptured={isCaptured}
+				photo={photo}
+				photoUrl={photoUrl}
+				annotationSheetContainer={annotationSheetContainer}
+			/>
+			<CameraPreviewControls
+				status={camera.status}
+				canSwitchCamera={camera.canSwitchCamera}
+				torchSupported={camera.torchSupported}
+				torchEnabled={camera.torchEnabled}
+				onStart={() => void camera.startCamera()}
+				onCapture={onCapture}
+				onSwitchCamera={() => void camera.switchCamera()}
+				onStop={camera.stopCamera}
+				onTorch={() => void camera.setTorch(!camera.torchEnabled)}
+			/>
+		</div>
+	);
+};
+
+const CaptureWorkspace = (props: CaptureWorkspaceProps) => {
 	const {
-		videoRef,
-		status,
-		error,
-		photo,
-		resolution,
-		torchSupported,
-		torchEnabled,
-		canSwitchCamera,
-		startCamera,
-		switchCamera,
-		stopCamera,
-		capturePhoto,
-		retakePhoto,
-		setTorch,
-	} = useCamera();
+		camera,
+		isLive,
+		isCaptured,
+		liveQuality,
+		qualityAtCapture,
+		setAnnotationSheetContainer,
+		onRetake,
+	} = props;
+	const { photo } = camera;
+
+	return (
+		<section
+			ref={setAnnotationSheetContainer}
+			aria-label={isCaptured ? "Annotate photo" : "Capture an image"}
+			className={`relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden ${isCaptured ? "rounded-xl border border-border/50 bg-surface p-3" : isLive ? "rounded-2xl bg-transparent" : "rounded-2xl bg-secondary"}`}
+		>
+			<div
+				data-capture-workspace
+				className={`relative min-h-0 min-w-0 ${isCaptured ? "grid flex-1 grid-rows-[minmax(0,1fr)_auto] gap-2 lg:grid-cols-[15rem_minmax(0,1fr)] lg:grid-rows-1 [@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[12rem_minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-1" : "flex min-h-0 flex-col"}`}
+			>
+				{isCaptured && photo && (
+					<div className="order-last min-w-0 lg:order-first">
+						<CapturedPhotoSummary
+							quality={qualityAtCapture ?? liveQuality}
+							onRetake={onRetake}
+							width={photo.width}
+							height={photo.height}
+							fileSize={formatFileSize(photo.blob.size)}
+						/>
+					</div>
+				)}
+				<div
+					className={`flex min-h-0 flex-1 ${isLive ? "justify-center" : ""} ${isCaptured ? "order-first min-w-0 lg:order-last" : ""}`}
+				>
+					<CapturePreviewFrame {...props} />
+				</div>
+			</div>
+		</section>
+	);
+};
+
+const CameraCapture = () => {
+	const camera = useCamera();
+	const { videoRef, status, error, photo, capturePhoto, retakePhoto } = camera;
 	const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 	const [annotationSheetContainer, setAnnotationSheetContainer] =
 		useState<HTMLElement | null>(null);
@@ -137,15 +315,7 @@ const CameraCapture = () => {
 	const isLive = status === "live";
 	const isCaptured = status === "captured" && photo !== null;
 	const liveQuality = useLiveImageQuality(videoRef, isLive);
-	const liveBorderClass = liveQuality.unavailable
-		? "border-surface/50"
-		: liveQuality.overall === "good"
-			? "border-success"
-			: liveQuality.overall === "warning"
-				? "border-amber-400"
-				: liveQuality.overall === "poor"
-					? "border-error"
-					: "border-surface/50";
+	const liveBorderClass = getLiveBorderClass(liveQuality);
 	const handleCapture = () => {
 		setQualityAtCapture(liveQuality);
 		void capturePhoto();
@@ -173,7 +343,7 @@ const CameraCapture = () => {
 			className={`grid h-dvh grid-rows-[auto_minmax(0,1fr)] bg-primary-light ${isCaptured ? "gap-2 p-3 sm:p-4" : "gap-4 p-4 sm:gap-5 sm:p-6"}`}
 		>
 			<header
-				className={`mx-auto flex w-full items-center justify-between ${isCaptured ? "max-w-7xl" : "max-w-5xl"}`}
+				className={`mx-auto flex w-full items-center justify-between ${isCaptured ? "max-w-7xl" : isLive ? "max-w-none" : "max-w-5xl"}`}
 			>
 				<div className="inline-flex items-center gap-2.5">
 					<Link
@@ -190,110 +360,21 @@ const CameraCapture = () => {
 			</header>
 
 			<main
-				className={`mx-auto grid min-h-0 w-full min-w-0 ${isCaptured ? "max-w-7xl" : "max-w-5xl"}`}
+				className={`mx-auto grid min-h-0 w-full min-w-0 ${isCaptured ? "max-w-7xl" : isLive ? "max-w-none" : "max-w-5xl"}`}
 			>
-				<section
-					ref={setAnnotationSheetContainer}
-					aria-label={isCaptured ? "Annotate photo" : "Capture an image"}
-					className={`relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden ${isCaptured ? "rounded-xl border border-border/50 bg-surface p-3" : isLive ? "rounded-2xl bg-transparent" : "rounded-2xl bg-secondary"}`}
-				>
-					<div
-						data-capture-workspace
-						className={`relative min-h-0 min-w-0 ${
-							isCaptured
-								? "grid flex-1 grid-rows-[minmax(0,1fr)_auto] gap-2 lg:grid-cols-[15rem_minmax(0,1fr)] lg:grid-rows-1 [@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[12rem_minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-1"
-								: "flex min-h-0 flex-col"
-						}`}
-					>
-						{isCaptured && photo && (
-							<div className="order-last min-w-0 lg:order-first">
-								<CapturedPhotoSummary
-									quality={qualityAtCapture ?? liveQuality}
-									onRetake={handleRetake}
-									width={photo.width}
-									height={photo.height}
-									fileSize={formatFileSize(photo.blob.size)}
-								/>
-							</div>
-						)}
-
-						<div
-							className={`flex min-h-0 flex-1 ${isLive ? "justify-center" : ""} ${isCaptured ? "order-first min-w-0 lg:order-last" : ""}`}
-						>
-							<div
-								className={`relative overflow-hidden rounded-2xl text-center ${isLive ? `h-full w-auto max-w-full flex-none border-2 ${liveBorderClass}` : "flex min-h-0 flex-1 flex-col"} ${isCaptured ? "bg-surface" : isLive ? "bg-transparent text-surface" : "bg-secondary text-surface"} ${isLive ? "min-h-40" : ""}`}
-								style={
-									isLive && resolution
-										? {
-												aspectRatio: `${resolution.width} / ${resolution.height}`,
-											}
-										: undefined
-								}
-							>
-								<video
-									ref={videoRef}
-									autoPlay
-									muted
-									playsInline
-									aria-label="Live camera preview"
-									aria-hidden={!isLive}
-									className={
-										isLive
-											? "absolute inset-0 size-full object-contain"
-											: "hidden"
-									}
-								/>
-
-								{isLive &&
-									(liveQuality.unavailable ||
-										liveQuality.overall !== "good") && (
-										<CameraLiveQuality
-											quality={liveQuality}
-											torchSupported={torchSupported}
-											torchEnabled={torchEnabled}
-										/>
-									)}
-
-								{!isLive && !isCaptured && <AsciiFlowBackdrop />}
-
-								{isLive &&
-									!liveQuality.unavailable &&
-									liveQuality.overall === "good" && (
-										<p
-											aria-live="polite"
-											className="pointer-events-none absolute left-1/2 top-3 z-10 w-fit max-w-[calc(100%_-_1.5rem)] -translate-x-1/2 rounded-xl border border-success/40 bg-secondary/50 px-3 py-1.5 text-sm font-semibold text-surface shadow-sm backdrop-blur-sm"
-										>
-											Looks good — take the photo now.
-										</p>
-									)}
-
-								{isCaptured && photoUrl && annotationSheetContainer ? (
-									<ImageAnnotationEditor
-										imageUrl={photoUrl}
-										imageWidth={photo.width}
-										imageHeight={photo.height}
-										annotationSheetContainer={annotationSheetContainer}
-									/>
-								) : isCaptured ? (
-									<p className="absolute inset-0 z-10 m-0 grid place-content-center p-4 text-regular leading-relaxed text-white/90 lg:text-base lg:leading-6">
-										Preparing photo preview…
-									</p>
-								) : null}
-								<CameraPreviewControls
-									status={status}
-									canSwitchCamera={canSwitchCamera}
-									torchSupported={torchSupported}
-									torchEnabled={torchEnabled}
-									onStart={() => void startCamera()}
-									onCapture={handleCapture}
-									onSwitchCamera={() => void switchCamera()}
-									onStop={stopCamera}
-									onTorch={() => void setTorch(!torchEnabled)}
-								/>
-							</div>
-						</div>
-					</div>
-				</section>
+				<CaptureWorkspace
+					camera={camera}
+					isLive={isLive}
+					isCaptured={isCaptured}
+					liveQuality={liveQuality}
+					qualityAtCapture={qualityAtCapture}
+					liveBorderClass={liveBorderClass}
+					photoUrl={photoUrl}
+					annotationSheetContainer={annotationSheetContainer}
+					setAnnotationSheetContainer={setAnnotationSheetContainer}
+					onCapture={handleCapture}
+					onRetake={handleRetake}
+				/>
 			</main>
 		</div>
 	);

@@ -4,6 +4,7 @@ export type CameraStatus =
 	| "idle"
 	| "requesting"
 	| "live"
+	| "capturing"
 	| "captured"
 	| "error";
 
@@ -270,6 +271,7 @@ export const useCamera = () => {
 			return null;
 		}
 
+		setStatus("capturing");
 		const canvas = document.createElement("canvas");
 		canvas.width = width;
 		canvas.height = height;
@@ -307,6 +309,7 @@ export const useCamera = () => {
 					"Photo could not be captured. Try again.",
 				),
 			);
+			setStatus("live");
 			return null;
 		}
 	}, [releaseStream]);

@@ -317,47 +317,51 @@ const ImageAnnotationEditor = ({
 	imageWidth,
 	imageHeight,
 	annotationSheetContainer,
-}: ImageAnnotationEditorProps) => (
-	<Annotorious>
-		<div className="relative min-h-0 min-w-0 flex-1">
-			<div className="flex size-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg [container-type:size]">
-				<div
-					className="relative lg:translate-x-[-7.75rem] lg:max-w-[calc(100cqw_-_15rem)] [@media(max-height:34rem)_and_(min-width:40rem)]:translate-x-[-6.25rem] [@media(max-height:34rem)_and_(min-width:40rem)]:max-w-[calc(100cqw_-_12rem)]"
-					style={{
-						width: `min(100cqw, ${(imageWidth / imageHeight) * 100}cqh)`,
-						aspectRatio: `${imageWidth} / ${imageHeight}`,
-					}}
-				>
-					<ImageAnnotator
-						containerClassName="relative size-full [&_.a9s-inner]:fill-primary/5! [&_.a9s-inner]:stroke-primary! [&_.a9s-outer]:hidden! [&_.a9s-inner]:[stroke-width:1px]! [&_.a9s-handle-dot]:stroke-primary!"
-						drawingMode="drag"
-						tool="rectangle"
+}: ImageAnnotationEditorProps) => {
+	return (
+		<Annotorious>
+			<div className="relative min-h-0 min-w-0 flex-1">
+				<div className="flex size-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-lg [container-type:size]">
+					<div
+						className="relative lg:translate-x-[-7.75rem] lg:max-w-[calc(100cqw_-_15rem)] [@media(max-height:34rem)_and_(min-width:40rem)]:translate-x-[-6.25rem] [@media(max-height:34rem)_and_(min-width:40rem)]:max-w-[calc(100cqw_-_12rem)]"
+						style={{
+							width: `min(100cqw, ${(imageWidth / imageHeight) * 100}cqh)`,
+							aspectRatio: `${imageWidth} / ${imageHeight}`,
+						}}
 					>
-						<img
-							src={imageUrl}
-							width={imageWidth}
-							height={imageHeight}
-							alt="Captured photo. Draw boxes to mark areas needing attention."
-							className="block size-full"
+						<ImageAnnotator
+							containerClassName="relative size-full [&_.a9s-inner]:fill-primary/5! [&_.a9s-inner]:stroke-primary! [&_.a9s-outer]:hidden! [&_.a9s-inner]:[stroke-width:1px]! [&_.a9s-handle-dot]:stroke-primary!"
+							drawingMode="drag"
+							tool="rectangle"
+						>
+							<img
+								src={imageUrl}
+								width={imageWidth}
+								height={imageHeight}
+								alt="Captured scene. Draw boxes to mark areas needing attention."
+								className="block size-full"
+							/>
+						</ImageAnnotator>
+						<AnnotationNumberMarkers
+							imageWidth={imageWidth}
+							imageHeight={imageHeight}
 						/>
-					</ImageAnnotator>
-					<AnnotationNumberMarkers
-						imageWidth={imageWidth}
-						imageHeight={imageHeight}
-					/>
+					</div>
 				</div>
+				<AnnotationSidebar
+					annotationSheetContainer={annotationSheetContainer}
+				/>
 			</div>
-			<AnnotationSidebar annotationSheetContainer={annotationSheetContainer} />
-		</div>
-		{createPortal(
-			<ImageAnnotationPopup
-				popup={(props) => (
-					<AnnotationLabelForm key={props.annotation.id} {...props} />
-				)}
-			/>,
-			document.body,
-		)}
-	</Annotorious>
-);
+			{createPortal(
+				<ImageAnnotationPopup
+					popup={(props) => (
+						<AnnotationLabelForm key={props.annotation.id} {...props} />
+					)}
+				/>,
+				annotationSheetContainer.ownerDocument.body,
+			)}
+		</Annotorious>
+	);
+};
 
 export default ImageAnnotationEditor;
