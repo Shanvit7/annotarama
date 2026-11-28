@@ -1,12 +1,10 @@
-// Run with the dev server: ego-browser nodejs < scripts/check-live-camera.mjs
+// Run with the dev server: ego-browser nodejs < scripts/ego-browser/check-live-camera.mjs
 // Deterministic canvas stream; never requests physical camera permission.
 const assert = (await import("node:assert/strict")).default;
-const existing = (await listTaskSpaces()).find((space) => space.name === "Camera transparency and framing guide");
-const task = !existing ? await taskSpace("Camera transparency and framing guide") :
-	existing.ownership === "user" ? await claimTaskSpace(existing.id) :
-	await taskSpace(existing.id);
-const page = (await task.pages())[0] ?? await task.adopt((await task.tabs())[0].page);
-await page.goto("http://localhost:3000/capture");
+const task = await taskSpace(`Annotarama live camera ${Date.now()}`);
+const page = task.page("p1");
+const baseUrl = globalThis.egoCheckBaseUrl ?? "http://localhost:3000";
+await page.goto(`${baseUrl}/capture`);
 await page.waitForSelector('button:has-text("Start camera")', { state: "visible" });
 const checkLayout = async (stage) => {
 	for (const [width, height] of [[393, 852], [412, 924], [768, 1024], [1024, 768], [1440, 900]]) {
@@ -165,28 +163,23 @@ for (const [width, height] of [[390, 844], [320, 568], [844, 390], [640, 360], [
 }
 await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 console.log({ layouts, screenshot: await page.screenshot({ path: "/tmp/annotarama-live-framing-guide.png" }) });
-// Native stills path: ImageCapture must win over the video-frame fallback and report real dimensions.
-await page.evaluate(() => {
-	class FakeImageCapture {
-		async getPhotoCapabilities() {
-			return { imageWidth: { max: 4032 }, imageHeight: { max: 3024 } };
-		}
-		async takePhoto() {
-			const canvas = document.createElement("canvas");
-			canvas.width = 4032;
-			canvas.height = 3024;
-			canvas.getContext("2d").fillRect(0, 0, 4032, 3024);
-			return await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-		}
-	}
-	window.ImageCapture = FakeImageCapture;
-});
+// Capture should match the current dark preview frame rather than an older still.
 await page.click('[aria-label="Capture photo"]');
 await page.waitForSelector("#captured-photo-summary-heading");
-const nativeDetails = await page.evaluate(() => document.querySelector("#captured-photo-summary-heading")?.parentElement?.textContent ?? "");
-assert.match(nativeDetails, /4032 × 3024/, "native stills capture at sensor resolution");
-assert.match(nativeDetails, /Photo quality · Fair/, "small native photo receives a fair verdict");
-assert.match(nativeDetails, /File is unusually small/, "sub-100 KB photo explains its warning");
+const firstCaptureDetails = await page.evaluate(() => document.querySelector("#captured-photo-summary-heading")?.parentElement?.textContent ?? "");
+assert.match(firstCaptureDetails, /640 × 480/, "capture uses current preview dimensions");
+const capturedFrame = await page.evaluate(async () => {
+	const image = document.querySelector('img[alt="Captured scene"]');
+	await image.decode();
+	const canvas = document.createElement("canvas");
+	canvas.width = image.naturalWidth;
+	canvas.height = image.naturalHeight;
+	const context = canvas.getContext("2d");
+	context.drawImage(image, 0, 0);
+	return { width: canvas.width, height: canvas.height, red: context.getImageData(320, 240, 1, 1).data[0] };
+});
+assert.deepEqual({ width: capturedFrame.width, height: capturedFrame.height }, { width: 640, height: 480 });
+assert.ok(capturedFrame.red < 20, `capture matches current dark preview, not stale bright frame: ${capturedFrame.red}`);
 assert.equal(await page.evaluate(() => !!document.querySelector('[aria-label="Review photo"]')), true);
 const sameCameraFrame = await page.evaluate(() => {
 	const image = document.querySelector('img[alt="Captured scene"]');
@@ -207,10 +200,7 @@ await seedDraftAnnotations([{ id: "old-annotation" }]);
 await page.click('text="Retake photo"');
 await page.waitForSelector('[aria-label="Capture photo"]');
 assert.equal(await readDraftAnnotations(), null, "Retake deletes the previous photo and annotations");
-await page.evaluate(() => {
-	delete window.ImageCapture;
-	window.cameraQA.dark = false;
-});
+await page.evaluate(() => { window.cameraQA.dark = false; });
 await page.click('[aria-label="Capture photo"]');
 await page.waitForSelector("#captured-photo-summary-heading");
 await checkLayout("captured");
@@ -236,7 +226,7 @@ assert.deepEqual(await readDraftAnnotations(), [], "New photo starts with no old
 await page.click('text="Continue to annotate"');
 await page.waitForSelector('[aria-label="Photo canvas"]');
 await page.evaluate(() => sessionStorage.removeItem("annotarama:photo-session"));
-await page.goto("http://localhost:3000/capture");
+await page.goto(`${baseUrl}/capture`);
 await page.waitForSelector('button:has-text("Start camera")', { state: "visible" });
 await page.evaluate(() => {
 	const canvas = document.createElement("canvas");
@@ -267,6 +257,7 @@ await waitForText("Allow camera access in your browser settings");
 await page.evaluate(() => { Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: undefined }); });
 await page.click('text="Try again"');
 await waitForText("Camera access is unavailable here");
-console.log("PASS: front/rear camera switching, sensor-resolution stills with frame fallback, balanced warmup, dark/stale advisory capture, supported/unsupported torch, capture/retake, permission denial, unsupported camera, five responsive layouts.");
+console.log("PASS: front/rear switching, current dark-frame capture, balanced warmup, supported/unsupported torch, retake, permission denial, unsupported camera, five responsive layouts.");
 console.log({ spaceId: task.spaceId, page: page.label });
-// Inspect the screenshot, then finish this space in a separate ego-browser call.
+await task.finish({ keep: [] });
+// On failure, isolated browser space stays open for diagnosis.

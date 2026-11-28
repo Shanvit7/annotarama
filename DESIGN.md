@@ -94,7 +94,7 @@ spacing:
 
 **Creative North Star: “Loopr AI — confident clarity for a modern product.”** The user selected Loopr AI as the north star. Preserve its observed blue-led palette and Outfit typography while keeping the interface crisp, legible, and focused on the work.
 
-This is a visual reference, not a request to copy Loopr’s page layouts or product content. The current app is still a TanStack starter; palette and typography are established, while component patterns remain provisional until the product UI exists.
+This is a visual reference, not a request to copy Loopr’s page layouts or product content. Annotarama now has a working camera-capture and annotation experience; use this document as its visual direction, not as a starter-app placeholder spec.
 
 **Key Characteristics:**
 - Loopr-inspired, blue-led identity.
@@ -143,17 +143,17 @@ The palette pairs a saturated indigo primary with deep navy support, vivid blue 
 
 ## Layout
 
-Loopr's supplied tokens specify global page padding of 64px; section padding of 112px, 80px, or 48px; content max-widths from 320px to 1280px; and layout container widths of 768px, 1024px, and 1280px. Use these as the reference scale, adapting global padding for smaller viewports rather than assuming desktop spacing fits mobile. The starter route itself remains centered at 42rem with 2rem top spacing; that is starter-page behavior, not a global constraint.
+Loopr's supplied tokens specify global page padding of 64px; section padding of 112px, 80px, or 48px; content max-widths from 320px to 1280px; and layout container widths of 768px, 1024px, and 1280px. Treat these as a reference scale, not fixed app-wide geometry. The landing page uses a responsive split hero; camera and annotation screens use task-specific responsive workspaces, with compact layouts adapted for touch and short viewports.
 
 ## Shapes
 
-Loopr's supplied root assigns 16px to small, medium, and large radii: there is no radius progression. Borders and dividers use 1px strokes. Preserve that uniform radius when adopting the source system; do not invent a graduated scale.
+Loopr's supplied root assigns 16px to small, medium, and large radii: there is no source radius progression. Existing app components use compact radii for controls and larger radii for surfaces; keep shape choices consistent within each component rather than forcing one radius across every control.
 
 ## Components
 
 The Annotarama logo is `public/favicon.svg`: an icon-only open indigo loop with a diagonal pen nib on a transparent background, also used as the browser favicon. The header places this mark and wordmark in a single floating, translucent glass toolbar; no marketing navigation or extra copy. Borrow the Loopr palette and visual clarity, not its logo geometry or copy.
 
-The landing page uses a pale-indigo hero, primary-blue heading, and one compact primary action (`h-11 px-4 gap-2 rounded-lg`, white text, visible focus). Visible copy is limited to the wordmark, one headline, and one Get started action. The enlarged Anatomy illustration introduces a phone first, then a machined bearing housing; the phone scans the part and matching boxes mark a damaged rim in both views. The sequence runs once and holds on the finished annotation; reduced-motion users see that state immediately. No playback controls. Geometry is generated from the Anatomy kit with `pnpm build:inspection`; no geometry engine is shipped to the browser. `/capture` is a placeholder with one concise in-progress message, not a working camera workflow. These are landing-page patterns, not a fully designed app component library.
+The landing page uses a pale-indigo hero, primary-blue heading, one Get started action, and the original Annotarama wordmark. Its Anatomy illustration shows the capture-and-annotation workflow and holds on the completed state; reduced-motion users see that state immediately. Geometry is generated from the Anatomy kit with `pnpm build:inspection`; no geometry engine is shipped to the browser. Get started opens `/capture`, the implemented camera workflow. Capture uses a four-corner center framing guide; it is a visual composition aid, not autofocus control. In the captured-image editor, keyboard focus uses a subtle background tint and text-field border color instead of an outline ring. Landing-page style is not a mandate to force identical layout onto the task screens.
 
 ## Do's and Don'ts
 

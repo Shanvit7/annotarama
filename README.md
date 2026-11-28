@@ -23,19 +23,21 @@ pnpm install
 pnpm dev
 ```
 
-Open <http://localhost:3000>.
+Open <http://localhost:3000>. React Scan is opt-in: run `VITE_REACT_SCAN=true pnpm dev` when profiling renders; normal development runs without its hook instrumentation.
 
 ## Quality checks
 
 ```bash
-pnpm run test
+pnpm exec playwright install chromium # once per machine
+pnpm test
+pnpm test:e2e
 pnpm check
 pnpm typecheck
 pnpm knip
 pnpm build
 ```
 
-Husky runs Biome on staged files before commit. GitHub Actions runs tests and all four quality checks on pushes and pull requests to `main`.
+`pnpm test:e2e` starts the app automatically and runs a Chromium capture → annotate → refresh/restore flow with a synthetic camera. GitHub Actions installs Chromium and runs the same browser test on pull requests to `main`. Husky runs Biome on staged files before commit.
 
 ## GitHub Pages
 
@@ -51,7 +53,7 @@ After enabling **Settings → Pages → GitHub Actions** in the repository, push
 
 ## Technical notes
 
-- **Camera and quality:** requests an ideal 3840×2160 preview, then captures at the dimensions actually supplied by the browser. Quality checks are advisory live-preview estimates, not analysis of the saved still; thresholds are experimental. See [`docs/live-camera-quality.md`](docs/live-camera-quality.md).
+- **Camera, torch, and quality:** requests an ideal 3840×2160 preview, then captures at the dimensions actually supplied by the browser. Torch control is shown only when the active camera reports torch support; unsupported controls are omitted rather than shown disabled, since they cannot be used. After a toggle, the UI reads the track’s reported torch state when available, falling back to the requested state if the browser does not report it. Quality checks are advisory live-preview estimates, not analysis of the saved still; thresholds are experimental. See [`docs/live-camera-quality.md`](docs/live-camera-quality.md).
 - **Annotations and session storage:** `@annotorious/react` manages rectangles; Dexie/IndexedDB stores the photo and its annotation geometry/labels for the current tab. Same-tab refresh restores them; tab-close cleanup is queued for the next visit to this origin. Storage is local, temporary, and not synced or exported. See [`docs/annotation-editor.md`](docs/annotation-editor.md).
 - **Vite** is the TanStack Start build tool; see [`docs/adr/0001-vite-build-tool.md`](docs/adr/0001-vite-build-tool.md).
 - **Loopr AI** is a visual reference, not a template to copy. Reuse the palette, typography, and spacing documented in [`DESIGN.md`](DESIGN.md), while keeping Annotarama's own logo and product UI original.

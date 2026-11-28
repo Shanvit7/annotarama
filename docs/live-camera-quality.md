@@ -1,10 +1,10 @@
 # Live camera quality
 
-Live camera checks are advisory: they never disable the shutter, capture automatically, enable the torch, or upload frames. Captured-photo review retains the last live reading from before the shutter as an estimate, beside the actual still-image resolution and file size; it is not a measurement of the saved photo. Camera controls sit inside the preview; very short screens scroll the preview/quality region instead of collapsing the viewfinder.
+Live camera checks are advisory: they never disable the shutter, capture automatically, enable the torch, or upload frames. Captured-photo review retains the last live reading from before the shutter as an estimate, beside the actual still-image resolution and file size; it is not a measurement of the saved photo. Camera controls sit inside the preview; very short screens scroll the preview/quality region instead of collapsing the viewfinder. The live preview shows a four-corner center framing guide; it is a visual composition aid and does not control autofocus.
 
 ## Pipeline and experimental defaults
 
-`useCamera` owns the stream. `useLiveImageQuality` is enabled only while preview status is `live`; its hook cancels sampling when capture completes or the camera stops. `CameraCapture` snapshots the latest reading when the shutter is pressed. `CapturedPhotoSummary` pairs that advisory live reading with the captured image's actual canvas dimensions and encoded file size. Its compact metric grid uses the Animata widget's grouped-stat pattern without fabricated percentages. On desktop and short-landscape layouts, the details card sits left while the photo stays centered across the full workspace; on narrow portrait screens, the card follows the photo to preserve image width. Sampling observes the existing video, not another camera stream.
+`useCamera` owns the stream. `useLiveImageQuality` is enabled only while preview status is `live`; its hook cancels sampling when capture completes or the camera stops. `CameraCapture` snapshots the latest reading when the shutter is pressed. `CapturedPhotoSummary` pairs that advisory live reading with the captured image's actual canvas dimensions and encoded file size. Its compact metric grid uses the Animata widget's grouped-stat pattern without fabricated percentages. On desktop and short-landscape layouts, the photo sits left of a right-side inspector, with photo details above annotations. On narrow portrait screens, the inspector follows the photo, with annotations before photo details. Sampling observes the existing video, not another camera stream.
 
 - Native video frame callbacks, with a 200 ms minimum sample interval; timer fallback when unsupported. A watchdog removes stale results after a gap greater than 400 ms. Frozen fallback frames cannot recover until video media time advances.
 - One reusable canvas, `willReadFrequently: true`; preserve intrinsic aspect ratio, cap longest analysis side at 320, never upscale. Canvas and two independent grayscale buffers resize only when needed.
@@ -35,11 +35,15 @@ The metric/sampler suite covers luma conversion, aspect ratio, synthetic sharp/b
 With `pnpm dev` running and Ego Browser installed:
 
 ```sh
-ego-browser nodejs < scripts/check-live-camera.mjs
-ego-browser nodejs < scripts/check-annotation-ui.mjs
+pnpm test:ego
+
+# Or run checks individually:
+ego-browser nodejs < scripts/ego-browser/check-live-camera.mjs
+ego-browser nodejs < scripts/ego-browser/check-annotation-ui.mjs
+ego-browser nodejs < scripts/ego-browser/check-ascii-backdrop.mjs
 ```
 
-The browser smoke check uses a deterministic canvas-backed camera and mocked capabilities/errors, without requesting a real device. It checks balanced warmup, capture while conditions deteriorate or become unavailable, torch on/off/absent, capture/retake and retained quality details, permission-denied and unsupported-camera UI, and layouts at 390×844, 320×568, 844×390, 640×360 and 320×480. The annotation UI check also verifies photo metadata and live-check values in the captured summary. Inspect `/tmp/annotarama-live-quality.png`, then close the printed task space with `task.finish({ keep: [] })` in a separate Ego Browser call. Real permission prompts are not exercised by these mocks.
+The browser checks use deterministic canvas-backed media and mocked capabilities/errors, without requesting a real device. They cover camera switching, torch, capture/retake, permission errors, responsive layouts, photo metadata, labels, annotations, and same-tab restore. Successful runs close their isolated task spaces; failures leave the space open for diagnosis. Screenshots are saved under `/tmp`. Real permission prompts are not exercised by these mocks. See `scripts/ego-browser/README.md` for coverage and setup.
 
 ### Results and limits
 

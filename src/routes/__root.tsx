@@ -3,13 +3,56 @@ import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Toaster } from "@yusufceng1z/ding-react";
 import { useEffect } from "react";
 import { AnnotationDeleteConfirmation } from "@/components/molecules/annotation-delete-confirmation";
-import { APP_FAVICON_URL, APP_IS_DEVELOPMENT } from "@/lib/constants";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+	APP_FAVICON_URL,
+	APP_IS_DEVELOPMENT,
+	APP_REACT_SCAN_ENABLED,
+} from "@/lib/constants";
 import {
 	getOrCreatePhotoSessionId,
 	startPhotoDraftCleanup,
 } from "@/lib/photo-drafts";
 
 import appCss from "@/styles.css?url";
+
+const PhotoDraftCleanup = () => {
+	useEffect(() => {
+		getOrCreatePhotoSessionId();
+		return startPhotoDraftCleanup();
+	}, []);
+	return null;
+};
+
+const RootDocument = ({ children }: { children: React.ReactNode }) => {
+	useEffect(() => {
+		if (APP_IS_DEVELOPMENT) return;
+		betterlytics.init("shanvit7-mwzbnwag", {
+			trackErrors: true,
+			trackConsoleErrors: true,
+		});
+	}, []);
+
+	return (
+		<html lang="en">
+			<head>
+				{APP_IS_DEVELOPMENT && APP_REACT_SCAN_ENABLED && (
+					<script type="module" src="/src/react-scan.ts" />
+				)}
+				<HeadContent />
+			</head>
+			<body>
+				<TooltipProvider delayDuration={300}>
+					<PhotoDraftCleanup />
+					{children}
+					<AnnotationDeleteConfirmation />
+					<Toaster position="top-center" theme="light" />
+				</TooltipProvider>
+				<Scripts />
+			</body>
+		</html>
+	);
+};
 
 export const Route = createRootRoute({
 	head: () => ({
@@ -39,39 +82,3 @@ export const Route = createRootRoute({
 	}),
 	shellComponent: RootDocument,
 });
-
-const PhotoDraftCleanup = () => {
-	useEffect(() => {
-		getOrCreatePhotoSessionId();
-		return startPhotoDraftCleanup();
-	}, []);
-	return null;
-};
-
-function RootDocument({ children }: { children: React.ReactNode }) {
-	useEffect(() => {
-		if (APP_IS_DEVELOPMENT) return;
-		betterlytics.init("shanvit7-mwzbnwag", {
-			trackErrors: true,
-			trackConsoleErrors: true,
-		});
-	}, []);
-
-	return (
-		<html lang="en">
-			<head>
-				{APP_IS_DEVELOPMENT && (
-					<script type="module" src="/src/react-scan.ts" />
-				)}
-				<HeadContent />
-			</head>
-			<body>
-				<PhotoDraftCleanup />
-				{children}
-				<AnnotationDeleteConfirmation />
-				<Toaster position="top-center" theme="light" />
-				<Scripts />
-			</body>
-		</html>
-	);
-}

@@ -1,6 +1,9 @@
 import type { ImageAnnotation } from "@annotorious/react";
 import { AsciiFlowBackdrop } from "@/components/atoms/ascii-flow-backdrop";
-import { CameraPreviewControls } from "@/components/molecules/camera-preview-controls";
+import {
+	CameraPreviewControls,
+	CapturingOverlay,
+} from "@/components/molecules/camera-preview-controls";
 import { PhotoRestorePlaceholder } from "@/components/organisms/camera-capture/photo-restore-placeholder";
 import {
 	CameraLiveQuality,
@@ -107,9 +110,18 @@ const CapturedPhotoPreview = ({
 	if (!isCaptured) return null;
 	if (isPhotoSaving) {
 		return (
-			<p className="absolute inset-0 z-10 m-0 grid place-content-center p-4 text-regular leading-relaxed text-white/90">
-				Saving photo for this tab…
-			</p>
+			<>
+				{photoUrl && photo && (
+					<img
+						src={photoUrl}
+						width={photo.width}
+						height={photo.height}
+						alt=""
+						className="absolute inset-0 size-full scale-105 object-cover blur-sm"
+					/>
+				)}
+				<CapturingOverlay />
+			</>
 		);
 	}
 	if (photoUrl && photo) {
@@ -171,8 +183,19 @@ const CameraFocusGuide = ({ isLive }: { isLive: boolean }) =>
 			role="img"
 			aria-label="Center framing guide. Does not control camera focus."
 			data-camera-focus-guide
-			className="pointer-events-none absolute left-1/2 top-1/2 z-[1] aspect-square w-[min(55vw,18rem)] -translate-x-1/2 -translate-y-1/2 rounded-sm border border-surface/70 shadow-sm ring-1 ring-secondary/35"
-		/>
+			className="pointer-events-none absolute left-1/2 top-1/2 z-[1] aspect-square w-[min(55vw,18rem)] -translate-x-1/2 -translate-y-1/2 text-surface/90 drop-shadow-sm"
+		>
+			<svg viewBox="0 0 100 100" aria-hidden="true" className="size-full">
+				<path
+					d="M 2 24 V 2 H 24 M 76 2 H 98 V 24 M 98 76 V 98 H 76 M 24 98 H 2 V 76"
+					fill="none"
+					stroke="currentColor"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					strokeWidth="1.5"
+				/>
+			</svg>
+		</div>
 	);
 
 const CapturePreviewFrame = ({
@@ -205,7 +228,9 @@ const CapturePreviewFrame = ({
 				aria-label="Live camera preview"
 				aria-hidden={!isLive}
 				className={
-					isLive ? "absolute inset-0 size-full object-cover" : "hidden"
+					isLive
+						? `absolute inset-0 size-full object-cover ${camera.status === "capturing" ? "scale-105 blur-sm" : ""}`
+						: "hidden"
 				}
 			/>
 			<CameraFocusGuide isLive={isLive} />

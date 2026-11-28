@@ -2,6 +2,7 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import {
 	RouteErrorPage,
 	RouteNotFoundPage,
+	RoutePendingPage,
 } from "@/components/organisms/route-state-page";
 import { APP_BASE_PATH } from "@/lib/constants";
 import { logger } from "@/lib/logger";
@@ -16,6 +17,9 @@ export function getRouter() {
 		defaultPreloadStaleTime: 0,
 		defaultErrorComponent: RouteErrorPage,
 		defaultNotFoundComponent: RouteNotFoundPage,
+		defaultPendingComponent: RoutePendingPage,
+		defaultPendingMs: 200,
+		defaultPendingMinMs: 150,
 		defaultOnCatch: (error, errorInfo) =>
 			logger.error("React error boundary caught an error", error, errorInfo),
 	});

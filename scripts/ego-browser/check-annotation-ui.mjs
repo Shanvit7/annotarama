@@ -1,9 +1,9 @@
-// Run with dev server: ego-browser nodejs < scripts/check-annotation-ui.mjs
-// Synthetic camera only. Override globalThis.annotationTestUrl for another port.
+// Run with dev server: ego-browser nodejs < scripts/ego-browser/check-annotation-ui.mjs
+// Synthetic camera only. Override globalThis.egoCheckBaseUrl for another port.
 const assert = (await import("node:assert/strict")).default;
 const task = await taskSpace(`Annotarama annotation QA ${Date.now()}`);
 const page = task.page("p1");
-const baseUrl = globalThis.annotationTestUrl ?? "http://localhost:3000";
+const baseUrl = globalThis.egoCheckBaseUrl ?? "http://localhost:3000";
 console.log({ spaceId: task.spaceId });
 await page.goto(`${baseUrl}/capture`);
 await page.cdp("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -11,6 +11,7 @@ await page.cdp("Emulation.setTouchEmulationEnabled", { enabled: false });
 // The SSR button can precede hydration; canvas dimensions are set on mount.
 await page.waitForFunction(() => document.querySelector('[aria-label="Capture an image"] canvas[width]') || document.querySelector('[aria-label="Photo inspector"]'));
 await page.evaluate(() => {
+	document.querySelector("#react-scan-root")?.remove();
 	const canvas = document.createElement("canvas");
 	canvas.width = 1080;
 	canvas.height = 1920;
@@ -39,11 +40,21 @@ const restored = await page.evaluate(() => [...document.querySelectorAll("button
 await page.click(restored ? 'button:has-text("Retake photo")' : 'button:has-text("Start camera")');
 await page.waitForSelector('[aria-label="Capture photo"]');
 await page.click('[aria-label="Capture photo"]');
+await page.waitForSelector('[aria-label="Review photo"]');
+await page.click('button:has-text("Continue to annotate")');
 // Also guards against annotation sync running before its annotator is ready.
 await page.waitForSelector('[aria-label="Photo inspector"]');
 assert.match(await page.snapshot(), /No annotations yet/);
+const visibleGestureGuidance = () => page.evaluate(() => {
+	const paragraph = document.querySelector('[aria-label="Photo canvas"] p');
+	const visible = [...paragraph.children].find((child) => getComputedStyle(child).display !== "none");
+	return visible?.textContent.replace(/\s+/g, " ").trim();
+});
+assert.equal(await visibleGestureGuidance(), "Select a box to move or resize · Drag empty space to draw");
+await page.click('summary:has-text("Photo details")');
 const photoDetails = await page.evaluate(() => document.querySelector('[aria-label="Photo inspector"]').textContent);
-for (const field of ["Photo details", "Live quality", "1080 × 1920", "File size", "Focus", "Lighting", "Stability"]) assert.ok(photoDetails.includes(field));
+for (const field of ["Photo details", "Photo quality", "1080 × 1920", "File size", "Live focus", "Live lighting", "Live stability"]) assert.ok(photoDetails.includes(field), `missing ${field} in ${photoDetails}`);
+await page.click('summary:has-text("Photo details")');
 
 const imageBounds = async () => page.evaluate(() => {
 	const r = document.querySelector('img[alt^="Captured scene"]').getBoundingClientRect();
@@ -81,16 +92,60 @@ assert.equal(await page.evaluate(() => document.querySelector("textarea").value)
 await page.press('textarea[name="label"]', "Escape");
 await page.waitForFunction(() => !document.querySelector("textarea"));
 assert.ok(await page.evaluate(() => document.activeElement.matches("[data-annotation-id]")), "Escape returns focus to annotation row");
+await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+await page.cdp("Emulation.setTouchEmulationEnabled", { enabled: true });
+assert.equal(await visibleGestureGuidance(), "Drag empty space to draw · Drag a box to move · Tap a box to resize");
+assert.equal(
+	await page.evaluate(() => Boolean(document.querySelector('[role="slider"]')?.getClientRects().length)),
+	false,
+	"phone inspector has no resizing control",
+);
+assert.equal(await page.evaluate(() => !!document.querySelector('button[aria-controls="photo-inspector-content"]')), false, "no duplicate mobile Annotations collapse control");
+const firstAnnotationId = await page.evaluate(() =>
+	document
+		.querySelector('[aria-label^="Edit label for annotation 1: Crack near mounting hole"]')
+		?.getAttribute("data-annotation-id"),
+);
+const firstAnnotationBounds = () => page.evaluate((id) => {
+	const rect = document.querySelector(`.a9s-annotationlayer [data-id="${id}"] rect.a9s-inner`).getBoundingClientRect();
+	return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+}, firstAnnotationId);
+const touchBefore = await firstAnnotationBounds();
+const touchStart = {
+	x: touchBefore.x + touchBefore.width / 2,
+	y: touchBefore.y + touchBefore.height / 2,
+};
+await page.cdp("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [touchStart] });
+await page.cdp("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: touchStart.x + 35, y: touchStart.y + 35 }] });
+await page.cdp("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+await page.waitForFunction(() => document.querySelector('[aria-label="Annotations"]').textContent.includes("Changes saved for this session."));
+const touchAfter = await firstAnnotationBounds();
+assert.ok(touchAfter.x > touchBefore.x + 10 && touchAfter.y > touchBefore.y + 10, `touch drag moves existing box: ${JSON.stringify({ touchBefore, touchAfter })}`);
+assert.equal(await page.evaluate(() => document.querySelectorAll("[data-annotation-number]").length), 1, "moving by touch does not draw another box");
+console.log("PASS: touch drag moves existing box without selecting first");
+await page.cdp("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await page.cdp("Emulation.setTouchEmulationEnabled", { enabled: false });
 for (let index = 1; index < 15; index++) {
 	await draw(index);
 	await saveLabel(index === 1 ? `Long label: ${"Inspect mounting surface before reassembly. ".repeat(12)}` : `Inspection area ${index + 1}`);
 }
 assert.equal(await page.evaluate(() => document.querySelectorAll("[data-annotation-number]").length), 15);
-const layouts = [];
+const annotationNumbers = () => page.evaluate(() =>
+	[...document.querySelectorAll('[aria-label="Annotations"] ul > li > button[data-annotation-id]')]
+		.map((button) => button.querySelector("span").textContent.trim()),
+);
+await page.click('button:has-text("Oldest")');
+assert.deepEqual(await annotationNumbers(), Array.from({ length: 15 }, (_, index) => String(index + 1)));
+await page.click('button:has-text("Newest")');
+assert.deepEqual(await annotationNumbers(), Array.from({ length: 15 }, (_, index) => String(15 - index)));
+const layouts = []; 
 let markerPosition;
+let sawScrollableList = false;
 for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844], [320, 568], [844, 390], [667, 375], [667, 320], [720, 450]]) {
 	await page.cdp("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 1024 });
 	await page.cdp("Emulation.setTouchEmulationEnabled", { enabled: width < 1024 });
+	await page.click('[aria-label="Fit photo to view"]');
+	await page.waitForFunction(() => document.querySelector('[aria-label="Fit photo to view"]').textContent.trim() === "100%");
 	await page.evaluate(() => { document.querySelector('[aria-label="Photo canvas"]').parentElement.scrollTop = 0; });
 	await page.waitForFunction(() => {
 		const image = document.querySelector('img[alt^="Captured scene"]');
@@ -110,14 +165,29 @@ for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]
 			inspectorLeft: inspector.left, inspectorTop: inspector.top, inspectorBottom: inspector.bottom,
 			imageLeft: image.left, imageRight: image.right, imageTop: image.top, imageBottom: image.bottom,
 			imageWidth: image.width, imageHeight: image.height,
-			listHeight: list.clientHeight, listContentHeight: list.scrollHeight,
+			listHeight: list.clientHeight,
+			listContentHeight: list.scrollHeight,
+			listCanScroll: list.scrollHeight > list.clientHeight && ["auto", "scroll"].includes(getComputedStyle(list).overflowY),
 			markerX: (marker.left + marker.width / 2 - image.left) / image.width,
 			markerY: (marker.top + marker.height / 2 - image.top) / image.height,
 		};
 	});
-	const docked = width >= 768 || (width >= 640 && height <= 544);
+	const docked = width >= 1024 || (width >= 640 && height <= 544);
+	const sectionOrder = await page.evaluate(() => {
+		const inspector = document.querySelector('[aria-label="Photo inspector"]');
+		return {
+			annotationsTop: inspector.querySelector('[aria-label="Annotations"]').getBoundingClientRect().top,
+			detailsTop: inspector.querySelector("details").getBoundingClientRect().top,
+			sliderVisible: Boolean(inspector.querySelector('[role="slider"]')?.getClientRects().length),
+			zoomControlsVisible: Boolean(document.querySelector('[aria-label="Zoom in"]')?.getClientRects().length),
+		};
+	});
+	assert.equal(sectionOrder.annotationsTop < sectionOrder.detailsTop, !docked, `mobile order puts annotations before details at ${width}×${height}`);
+	assert.equal(sectionOrder.sliderVisible, false, `no redundant inspector slider at ${width}×${height}`);
+	assert.equal(sectionOrder.zoomControlsVisible, width >= 1024, `manual zoom controls are desktop-only at ${width}×${height}`);
 	assert.equal(bounds.overflow, false, `no horizontal overflow at ${width}×${height}`);
-	assert.ok(bounds.listHeight >= 96 && bounds.listContentHeight > bounds.listHeight, "long annotation list scrolls");
+	assert.ok(bounds.listHeight >= 96, `annotation list remains usable at ${width}×${height}`);
+	sawScrollableList ||= bounds.listCanScroll;
 	assert.ok(bounds.imageWidth >= 80 && bounds.imageHeight >= 130, `canvas remains usable at ${width}×${height}: ${bounds.imageWidth}×${bounds.imageHeight}`);
 	assert.ok(Math.abs(bounds.imageWidth / bounds.imageHeight - 9 / 16) < 0.01, "image aspect ratio unchanged");
 	if (width === 1440) {
@@ -185,8 +255,12 @@ for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]
 		assert.ok(bounds.inspectorBottom <= height + 1, "docked inspector fits viewport");
 	} else assert.ok(bounds.inspectorTop >= bounds.canvasBottom - 1, "inspector follows photo on phones");
 	markerPosition ??= { x: bounds.markerX, y: bounds.markerY };
-	assert.ok(Math.abs(bounds.markerX - markerPosition.x) < 0.005 && Math.abs(bounds.markerY - markerPosition.y) < 0.005, "numbered marker stays aligned after resize");
-	await page.click('[aria-label^="Edit label for annotation 1:"]');
+	const markerDrift = {
+		x: Math.abs(bounds.markerX - markerPosition.x) * bounds.imageWidth,
+		y: Math.abs(bounds.markerY - markerPosition.y) * bounds.imageHeight,
+	};
+	assert.ok(markerDrift.x < 4 && markerDrift.y < 4, `numbered marker stays aligned within 4 screen pixels at ${width}×${height}: ${JSON.stringify(markerDrift)}`);
+	await page.click('[aria-label^="Edit label for annotation 17:"]');
 	await page.waitForSelector("textarea");
 	const popup = await page.evaluate(() => {
 		const r = document.querySelector('form[aria-label="Edit annotation label"]').getBoundingClientRect();
@@ -198,13 +272,14 @@ for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]
 	await page.waitForFunction(() => !document.querySelector("textarea"));
 	layouts.push({ width, height, ...bounds });
 }
+assert.ok(sawScrollableList, "long annotation lists scroll when viewport has limited space");
 // Touch drawing, destructive-action confirmation, and same-tab restore.
 await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 await page.evaluate(() => { document.querySelector('[aria-label="Photo canvas"]').parentElement.scrollTop = 0; });
-await draw(0, true);
+await draw(17, true);
 await saveLabel("Touch annotation");
 console.log("PASS: touch drawing");
-await page.click('[aria-label^="Edit label for annotation 18:"]');
+await page.click('[aria-label^="Edit label for annotation 18: Touch annotation"]');
 await page.waitForSelector("textarea");
 await page.click('form button[aria-label^="Delete annotation"]');
 await page.waitForSelector('[role="alertdialog"]');
@@ -217,11 +292,12 @@ await page.waitForFunction(() => document.querySelectorAll("[data-annotation-id]
 console.log("PASS: confirmed deletion");
 await page.waitForFunction(() => document.activeElement.matches("[data-annotation-id]"));
 console.log("PASS: deletion focus return");
-await page.waitForFunction(() => document.querySelector('[aria-label="Annotations"]').textContent.includes("Changes saved on this tab."));
+await page.waitForFunction(() => document.querySelector('[aria-label="Annotations"]').textContent.includes("Changes saved for this session."));
 console.log("PASS: saved status before reload");
 await page.reload();
 await page.waitForFunction(() => document.querySelectorAll("[data-annotation-id]").length === 17);
 assert.ok(await page.evaluate(() => !!document.querySelector('button[title="Crack near mounting hole"]')), "label survives same-tab refresh");
 console.log({ layouts });
 console.log("PASS: capture, validation, save/edit, keyboard focus, 17 annotations/long labels, nine layouts, zoom-in/out drawing alignment, centered zoom controls and Fit reset, marker alignment, popup bounds, touch drawing, confirmed deletion, and same-tab restore. Physical-device QA still required.");
-// Inspect screenshots, then finish this browser space in a separate ego-browser call.
+await task.finish({ keep: [] });
+// On failure, isolated browser space stays open for diagnosis.

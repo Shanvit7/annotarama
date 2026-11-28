@@ -10,10 +10,10 @@ related_targets: []
 - **Mode:** Persuade
 - **Audience and job:** People capturing and marking images, primarily manufacturing-floor workers. Explain the product in plain language.
 - **Offer and action:** Capture a photo, mark a part, add a short label. One **Get started** link opens `/capture`; the app is open and requires no sign-in.
-- **Proof and content:** An original Anatomy-kit phone enters first; a machined bearing housing appears later. The scan then marks the damaged rim on the part and in the matching phone preview. No visible demo captions, customer imagery, testimonials, stats, or product screenshots. The camera and annotation workflow is still being built; `/capture` remains an honest placeholder.
+- **Proof and content:** An original Anatomy inspection illustration shows image capture and annotation. No testimonials, stats, or fabricated claims. Get started opens the implemented camera-capture flow.
 - **Constraints:** Keep existing Annotarama/Loopr-inspired palette, Outfit, and original logo. Mobile-first behavior. No additional landing-page actions or invented functionality.
-- **Memorable moment:** Phone enters first; machine part appears second; scan then draws matching marks around the damaged rim. Sequence runs once and settles, with no playback controls.
-- **Unresolved:** Camera workflow, image quality thresholds, persistence, and export remain undecided or unbuilt.
+- **Memorable moment:** An Anatomy phone captures a part; matching annotations identify its damaged rim in the photo and magnified view, then hold on the finished state.
+- **Status:** Camera workflow and tab-local annotation persistence are implemented. Image-quality thresholds remain experimental; export is not implemented.
 
 ## Direction contract
 
@@ -21,9 +21,9 @@ related_targets: []
 
 **OWN-WORLD:** Use existing indigo, navy, white, Outfit, and original Annotarama mark. One custom isometric inspection figure carries the page; a crisp boundary on the damaged rim in both views shows the central action. No stock or borrowed assets.
 
-**STORY:** Visitor sees the image-marking task in the headline and illustration, then enters the placeholder workspace through one Get started action.
+**STORY:** Visitor sees what the app is for, understands capture → mark → label through the illustration, then opens the camera workflow without signing in.
 
-**FIRST VIEWPORT:** Pair the original logo and wordmark in a floating translucent glass app toolbar with a spacious pale-indigo hero. Left: one plain headline with a single highlighted phrase and the only action, Get started. Right: the phone enters first; a machined bearing housing follows; the scan marks its rim in both views. No captions or playback controls. The sequence runs once and settles; reduced-motion users see the static marked state immediately. On mobile, headline and action precede the illustration.
+**FIRST VIEWPORT:** The Annotarama wordmark anchors a responsive split hero. A concise headline and Get started action sit beside the custom Anatomy illustration; on mobile, copy and action precede the illustration.
 
 **FORM:** Minimal app-first single surface, not a marketing-site scaffold. Use a floating translucent glass toolbar with only the Annotarama mark and wordmark, then a spacious split hero with oversized Anatomy artwork; keep the user's Loopr palette, plain copy, and one action. No copied nav, added panels, or extra actions.
 

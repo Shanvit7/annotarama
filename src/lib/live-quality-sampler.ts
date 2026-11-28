@@ -20,6 +20,7 @@ export const startLiveQuality = (
 	let previous = new Uint8Array(0);
 	let filter = createQualityFilter();
 	let lastSample = 0;
+	let samplingSince = performance.now();
 	let lastMediaTime = -1;
 	let hasPrevious = false;
 	let source: HTMLVideoElement["srcObject"] = null;
@@ -81,6 +82,7 @@ export const startLiveQuality = (
 			height !== video.videoHeight
 		) {
 			reset();
+			samplingSince = now;
 			lastMediaTime = -1;
 			source = stream;
 			trackId = track?.id;
@@ -142,18 +144,23 @@ export const startLiveQuality = (
 		if (stopped || document.hidden) return;
 		const now = performance.now();
 		if (lastSample && now - lastSample > 400) reset(true);
+		else if (!lastSample && now - samplingSince > 2_000) reset(true);
 		if (typeof video.requestVideoFrameCallback !== "function") sample(now);
 		timer = setTimeout(poll, 200);
 	};
 	const resume = () => {
 		cancel();
+		samplingSince = performance.now();
 		reset();
 		if (stopped || document.hidden) return;
 		if (typeof video.requestVideoFrameCallback === "function")
 			frameId = video.requestVideoFrameCallback(tick);
 		timer = setTimeout(poll, 200);
 	};
-	const interrupt = () => reset();
+	const interrupt = () => {
+		samplingSince = performance.now();
+		reset();
+	};
 	document.addEventListener("visibilitychange", resume);
 	window.addEventListener("orientationchange", resume);
 	for (const event of ["emptied", "waiting", "pause", "ended"])

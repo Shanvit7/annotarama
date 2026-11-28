@@ -3,20 +3,20 @@
 - **Mode:** Persuade
 - **Audience and job:** People capturing and marking images, primarily manufacturing-floor workers. Explain the product in plain language.
 - **Offer and action:** Capture a photo, mark a part, add a short label. One **Get started** link opens `/capture`; the app is open and requires no sign-in.
-- **Proof and content:** A locally stored Unsplash electronics-workbench photo with one clearly illustrative annotation. No testimonials, stats, or product screenshots. The camera and annotation workflow is still being built; label the image as a demo and say so plainly.
+- **Proof and content:** An original Anatomy inspection illustration explains the product workflow. No testimonials, stats, or fabricated claims. Get started opens the implemented camera-capture flow.
 - **Constraints:** Keep existing Annotarama/Loopr-inspired palette, Outfit, and original logo. Mobile-first behavior. No additional landing-page actions or invented functionality.
-- **Memorable moment:** A single annotation boundary draws around a board detail and settles beside its label.
-- **Unresolved:** Camera workflow, image quality thresholds, persistence, and export remain undecided or unbuilt.
+- **Memorable moment:** An Anatomy phone captures a part; matching annotations identify its damaged rim in the photo and magnified view, then hold on the finished state.
+- **Status:** Camera workflow and tab-local annotation persistence are implemented. Image-quality thresholds remain experimental; export is not implemented.
 
 ## Direction contract
 
 **THESIS:** Let one marked photograph explain Annotarama. Refuse the usual stack of feature cards and claims.
 
-**OWN-WORLD:** Use existing indigo, navy, white, Outfit, and Annotarama mark. One real workshop photograph carries the page; one crisp boundary and plain label show the central action. No borrowed Loopr assets.
+**OWN-WORLD:** Use existing indigo, navy, white, Outfit, and Annotarama mark. The custom Anatomy illustration shows image capture and annotation; do not substitute a stock photo or borrowed Loopr assets.
 
-**STORY:** Visitor sees what the app is for, understands capture → mark → label, knows the preview is illustrative and tools are in progress, then enters the open placeholder workspace without signing in.
+**STORY:** Visitor sees what the app is for, understands capture → mark → label through the illustration, then opens the camera workflow without signing in.
 
-**FIRST VIEWPORT:** A quiet brand line sits above one wide photograph. Plain headline and short copy sit over its naturally dark left side; a single Get started action sits directly below. A drawn annotation and small demo label identify one board detail on the right. On mobile, copy and action precede the photo.
+**FIRST VIEWPORT:** The Annotarama wordmark anchors a responsive split hero. A concise headline and Get started action sit beside the custom Anatomy illustration; on mobile, copy and action precede the illustration.
 
 **FORM:** Inspection record, assigned lead from the direction hand; `seed:4d8a6ce0cfaa415a`.
 
