@@ -17,8 +17,6 @@ import type {
 } from "@annotorious/react";
 import {
 	ArrowUp,
-	ChevronDown,
-	ChevronUp,
 	ScanSearch,
 	SquareDashedMousePointer,
 	Trash2,
@@ -34,12 +32,14 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AnnotationDeleteConfirmation } from "@/components/molecules/annotation-delete-confirmation";
+import { CollapsiblePanel } from "@/components/molecules/collapsible-panel";
 import { PhotoZoomControls } from "@/components/molecules/photo-zoom-controls";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { adjustRectangleForKey } from "@/lib/annotation-keyboard";
 import { logger } from "@/lib/logger";
 import type { PhotoDraftStatus } from "@/lib/photo-drafts";
@@ -51,7 +51,10 @@ const AnnotationLabelForm = ({
 	onUpdateBody,
 }: PopupProps) => {
 	const annotator = useAnnotator();
+	const annotations = useAnnotations();
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const boxNumber =
+		annotations.findIndex((item) => item.id === annotation.id) + 1;
 	const body = annotation.bodies.find((item) => item.purpose === "commenting");
 	const [value, setValue] = useState(body?.value ?? "");
 	const [showError, setShowError] = useState(false);
@@ -95,7 +98,7 @@ const AnnotationLabelForm = ({
 	return (
 		<form
 			aria-label="Edit annotation label"
-			className="relative w-80 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl bg-surface text-left text-secondary shadow-lg shadow-secondary/20 ring-1 ring-border/60"
+			className="relative w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl bg-surface text-left text-secondary shadow-lg shadow-secondary/20"
 			onSubmit={(event) => {
 				event.preventDefault();
 				const label = value.trim();
@@ -114,18 +117,23 @@ const AnnotationLabelForm = ({
 				onClick={close}
 				aria-label="Close label editor"
 				title="Close"
-				className="absolute right-1 top-1 z-10 grid size-11 cursor-pointer place-items-center rounded-full text-neutral-dark transition-colors hover:bg-primary-light hover:text-secondary focus-visible:outline-2 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
+				className="absolute right-0 top-0 z-10 grid size-11 cursor-pointer place-items-center rounded-full text-neutral-dark transition-colors hover:bg-primary-light hover:text-secondary focus-visible:outline-2 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
 			>
 				<X aria-hidden="true" className="size-4" />
 			</button>
+			<div className="flex min-h-11 items-center gap-2 border-b border-border/60 px-3 pr-12 [@media(pointer:fine)]:min-h-9 [@media(pointer:fine)]:px-2 [@media(pointer:fine)]:pr-10">
+				<span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-tiny font-semibold tabular-nums text-surface shadow-sm ring-1 ring-surface">
+					{boxNumber}
+				</span>
+			</div>
 			<label className="sr-only" htmlFor={`label-${annotation.id}`}>
-				Annotation label
+				Annotation label for box {boxNumber}
 			</label>
 			<textarea
 				ref={textareaRef}
 				id={`label-${annotation.id}`}
 				name="label"
-				rows={3}
+				rows={4}
 				value={value}
 				placeholder="Add a label…"
 				aria-required="true"
@@ -146,7 +154,7 @@ const AnnotationLabelForm = ({
 						close();
 					}
 				}}
-				className="block w-full resize-none border-0 bg-transparent px-4 pb-3 pr-12 pt-3 text-base leading-6 text-ink caret-primary placeholder:text-neutral-dark focus-visible:outline-none focus-visible:ring-0 [@media(pointer:fine)]:text-sm"
+				className="block w-full resize-none border-0 bg-transparent px-3 py-1 text-base leading-6 text-ink caret-primary placeholder:text-neutral-dark focus-visible:outline-none focus-visible:ring-0 [@media(pointer:fine)]:text-sm"
 			/>
 			{showError && (
 				<p
@@ -157,7 +165,7 @@ const AnnotationLabelForm = ({
 					Enter a label before saving.
 				</p>
 			)}
-			<div className="flex items-center justify-between border-t border-border/60 px-2 py-1.5">
+			<div className="flex items-center justify-between border-t border-border/60 px-1 py-0">
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<button
@@ -175,9 +183,16 @@ const AnnotationLabelForm = ({
 					type="submit"
 					aria-label="Save label"
 					title="Save label"
-					className="grid size-11 cursor-pointer place-items-center rounded-full bg-primary text-surface shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
+					className="group relative grid size-11 cursor-pointer place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [@media(pointer:fine)]:size-8"
 				>
-					<ArrowUp aria-hidden="true" className="size-4" />
+					<span
+						aria-hidden="true"
+						className="absolute size-6 rounded-full bg-primary shadow-sm transition-colors group-hover:bg-primary-hover"
+					/>
+					<ArrowUp
+						aria-hidden="true"
+						className="relative size-3 text-surface"
+					/>
 				</button>
 			</div>
 		</form>
@@ -205,12 +220,18 @@ const AnnotationList = ({
 	setSortOrder,
 	imageWidth,
 	imageHeight,
+	canCollapse,
+	isCollapsed,
+	setIsCollapsed,
 }: {
 	draftStatus: PhotoDraftStatus;
 	sortOrder: AnnotationSortOrder;
 	setSortOrder: (order: AnnotationSortOrder) => void;
 	imageWidth: number;
 	imageHeight: number;
+	canCollapse: boolean;
+	isCollapsed: boolean;
+	setIsCollapsed: (isCollapsed: boolean) => void;
 }) => {
 	const annotator = useAnnotator();
 	const annotations = useAnnotations();
@@ -247,210 +268,194 @@ const AnnotationList = ({
 	return (
 		<section
 			aria-label="Annotations"
-			className="flex min-h-48 flex-col overflow-hidden bg-surface text-left md:min-h-0 md:flex-1 [@media(max-height:34rem)_and_(min-width:40rem)]:min-h-48 [@media(max-height:34rem)_and_(min-width:40rem)]:flex-none"
+			className={`order-1 flex min-h-12 flex-none flex-col overflow-hidden bg-surface text-left transition-[height] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none lg:h-auto lg:flex-[1_1_0%] lg:order-2 [@media(max-height:34rem)_and_(min-width:40rem)]:order-2 [@media(max-height:34rem)_and_(min-width:40rem)]:h-auto [@media(max-height:34rem)_and_(min-width:40rem)]:min-h-48 [@media(max-height:34rem)_and_(min-width:40rem)]:flex-none ${isCollapsed ? "h-12" : "h-[min(32dvh,calc(100dvh-18rem))]"}`}
 		>
-			<div className="flex h-12 shrink-0 items-center gap-2.5 px-4">
-				<ScanSearch aria-hidden="true" className="size-4 text-primary" />
-				<div className="flex min-w-0 items-center gap-2.5">
-					<h2
-						data-annotations-heading
-						tabIndex={-1}
-						className="m-0 text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-accent"
-					>
-						Annotations
-					</h2>
-					<output
-						aria-label={`${annotations.length} ${annotations.length === 1 ? "annotation" : "annotations"}`}
-						className="rounded bg-primary-light px-2 py-0.5 text-xs font-semibold tabular-nums text-primary"
-					>
-						{annotations.length > 999 ? "+999" : annotations.length}
-					</output>
-				</div>
-				<fieldset className="relative m-0 ml-auto inline-grid shrink-0 grid-cols-2 rounded-md border-0 bg-surface-muted p-0.5">
-					<legend className="sr-only">Annotation order</legend>
-					<span
-						aria-hidden="true"
-						className={`absolute inset-y-0.5 left-0.5 w-[calc(50%_-_0.125rem)] rounded bg-surface shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none ${sortOrder === "oldest" ? "translate-x-full" : "translate-x-0"}`}
-					/>
-					{(["newest", "oldest"] as const).map((order) => (
-						<button
-							key={order}
-							type="button"
-							aria-pressed={sortOrder === order}
-							onClick={() => setSortOrder(order)}
-							className={`relative min-h-9 cursor-pointer rounded px-2 text-xs font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none ${sortOrder === order ? "text-primary" : "text-neutral-dark hover:text-secondary"}`}
+			<CollapsiblePanel
+				open={!isCollapsed}
+				collapsible={canCollapse}
+				onOpenChange={(open) => setIsCollapsed(!open)}
+				headingProps={{
+					"data-annotations-heading": true,
+					tabIndex: -1,
+				}}
+				rowClassName="flex-1"
+				contentClassName="flex h-full min-h-0 flex-col"
+				label={
+					<>
+						<span className="sr-only">
+							{isCollapsed ? "Expand" : "Collapse"} annotations
+						</span>
+						<ScanSearch
+							aria-hidden="true"
+							className="size-4 shrink-0 text-primary"
+						/>
+						<span>Annotations</span>
+						<output
+							aria-label={`${annotations.length} ${annotations.length === 1 ? "annotation" : "annotations"}`}
+							className="rounded bg-primary-light px-2 py-0.5 text-xs font-semibold tabular-nums text-primary"
 						>
-							{order === "newest" ? "Newest" : "Oldest"}
-						</button>
-					))}
-				</fieldset>
-			</div>
-			<p
-				aria-live="polite"
-				className={`m-0 px-4 pb-3 text-tiny ${draftStatus === "error" ? "text-error" : "text-neutral-dark"}`}
+							{annotations.length > 999 ? "+999" : annotations.length}
+						</output>
+					</>
+				}
+				actions={
+					<fieldset className="relative m-0 inline-grid shrink-0 grid-cols-2 rounded-md border-0 bg-surface-muted p-0.5">
+						<legend className="sr-only">Annotation order</legend>
+						<span
+							aria-hidden="true"
+							className={`absolute inset-y-0.5 left-0.5 w-[calc(50%_-_0.125rem)] rounded bg-surface shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none ${sortOrder === "oldest" ? "translate-x-full" : "translate-x-0"}`}
+						/>
+						{(["newest", "oldest"] as const).map((order) => (
+							<button
+								key={order}
+								type="button"
+								aria-pressed={sortOrder === order}
+								onClick={() => setSortOrder(order)}
+								className={`relative min-h-9 cursor-pointer rounded px-2 text-xs font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none ${sortOrder === order ? "text-primary" : "text-neutral-dark hover:text-secondary"}`}
+							>
+								{order === "newest" ? "Newest" : "Oldest"}
+							</button>
+						))}
+					</fieldset>
+				}
 			>
-				{draftStatus === "saving"
-					? "Saving changes…"
-					: draftStatus === "error"
-						? "Changes could not be saved on this tab."
-						: "Changes saved on this tab."}
-			</p>
-			{annotations.length === 0 ? (
-				<div className="flex flex-col items-center gap-2 px-6 py-6 text-center">
-					<SquareDashedMousePointer
-						aria-hidden="true"
-						className="size-6 text-neutral-dark"
-					/>
-					<p className="m-0 text-sm font-medium text-secondary">
-						No annotations yet
-					</p>
-					<p className="m-0 max-w-52 text-xs leading-5 text-neutral-dark">
-						Drag on the photo to draw a box, then add a label.
-					</p>
-				</div>
-			) : (
-				<>
-					<p id="annotation-keyboard-help" className="sr-only">
-						Focus an annotation row. Arrow keys move its box 10 pixels; Alt plus
-						an arrow moves it 1 pixel. Shift plus an arrow resizes it. Enter
-						edits its label. Delete removes it.
-					</p>
-					<ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain px-2 pb-2">
-						{orderedAnnotations.map(({ annotation, number }) => {
-							const label = annotation.bodies
-								.find((body) => body.purpose === "commenting")
-								?.value?.trim();
+				<p
+					aria-live="polite"
+					className={`m-0 px-4 pb-3 text-tiny ${draftStatus === "error" ? "text-error" : "text-neutral-dark"}`}
+				>
+					{draftStatus === "saving"
+						? "Saving changes…"
+						: draftStatus === "error"
+							? "Changes could not be saved on this tab."
+							: "Changes saved for this session."}
+				</p>
+				{annotations.length === 0 ? (
+					<div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-y-auto px-6 py-6 text-center">
+						<SquareDashedMousePointer
+							aria-hidden="true"
+							className="size-6 text-neutral-dark"
+						/>
+						<p className="m-0 text-sm font-medium text-secondary">
+							No annotations yet
+						</p>
+						<p className="m-0 max-w-52 text-xs leading-5 text-neutral-dark">
+							Drag on the photo to draw a box, then add a label.
+						</p>
+					</div>
+				) : (
+					<>
+						<p id="annotation-keyboard-help" className="sr-only">
+							Focus an annotation row. Arrow keys move its box 10 pixels; Alt
+							plus an arrow moves it 1 pixel. Shift plus an arrow resizes it.
+							Enter edits its label. Delete removes it.
+						</p>
+						<ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain px-2 pb-2">
+							{orderedAnnotations.map(({ annotation, number }) => {
+								const label = annotation.bodies
+									.find((body) => body.purpose === "commenting")
+									?.value?.trim();
 
-							return (
-								<li
-									key={annotation.id}
-									className={`group flex min-w-0 items-center rounded-lg px-1.5 py-1 ${selectedId === annotation.id ? "bg-primary-light" : "hover:bg-surface-muted"}`}
-								>
-									<button
-										type="button"
-										onClick={() => annotator?.setSelected(annotation.id)}
-										aria-label={`Edit label for annotation ${number}${label ? `: ${label}` : ""}`}
-										aria-describedby="annotation-keyboard-help"
-										aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Delete Enter"
-										onKeyDown={(event) => {
-											if (event.key === "Delete") {
+								return (
+									<li
+										key={annotation.id}
+										className={`group flex min-w-0 items-center rounded-lg px-1.5 py-1 ${selectedId === annotation.id ? "bg-primary-light" : "hover:bg-surface-muted"}`}
+									>
+										<button
+											type="button"
+											onClick={() => annotator?.setSelected(annotation.id)}
+											aria-label={`Edit label for annotation ${number}${label ? `: ${label}` : ""}`}
+											aria-describedby="annotation-keyboard-help"
+											aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Delete Enter"
+											onKeyDown={(event) => {
+												if (event.key === "Delete") {
+													event.preventDefault();
+													if (!event.repeat)
+														void removeAnnotation(annotation, label);
+													return;
+												}
+
+												if (!event.key.startsWith("Arrow")) return;
 												event.preventDefault();
-												if (!event.repeat)
-													void removeAnnotation(annotation, label);
-												return;
-											}
+												const selector = annotation.target.selector;
+												if (selector.type !== ShapeType.RECTANGLE) return;
 
-											if (!event.key.startsWith("Arrow")) return;
-											event.preventDefault();
-											const selector = annotation.target.selector;
-											if (selector.type !== ShapeType.RECTANGLE) return;
-
-											const geometry = adjustRectangleForKey(
-												selector.geometry as RectangleGeometry,
-												event.key as
-													| "ArrowDown"
-													| "ArrowLeft"
-													| "ArrowRight"
-													| "ArrowUp",
-												imageWidth,
-												imageHeight,
-												event.shiftKey,
-												event.altKey,
-											);
-											annotator?.updateAnnotation({
-												...annotation,
-												target: {
-													...annotation.target,
-													selector: { ...selector, geometry },
-												},
-											});
-										}}
-										data-annotation-id={annotation.id}
-										aria-pressed={selectedId === annotation.id}
-										title={label || "Add a label"}
-										className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-secondary focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:min-h-9"
-									>
-										<span className="grid size-5 shrink-0 place-items-center rounded bg-primary-light text-tiny font-medium tabular-nums text-primary">
-											{number}
-										</span>
-										<span
-											className={`truncate ${label ? "font-medium" : "text-neutral-dark"}`}
-										>
-											{label || "Add a label…"}
-										</span>
-									</button>
-									<button
-										type="button"
-										onClick={async () => {
-											if (label) {
-												const confirmed =
-													await AnnotationDeleteConfirmation.call({});
-												if (!confirmed) return;
-											}
-
-											const row = document
-												.querySelector<HTMLButtonElement>(
-													`[data-annotation-id="${CSS.escape(annotation.id)}"]`,
-												)
-												?.closest("li");
-											const target =
-												row?.nextElementSibling?.querySelector<HTMLButtonElement>(
-													"[data-annotation-id]",
-												) ??
-												row?.previousElementSibling?.querySelector<HTMLButtonElement>(
-													"[data-annotation-id]",
-												) ??
-												document.querySelector<HTMLHeadingElement>(
-													"[data-annotations-heading]",
+												const geometry = adjustRectangleForKey(
+													selector.geometry as RectangleGeometry,
+													event.key as
+														| "ArrowDown"
+														| "ArrowLeft"
+														| "ArrowRight"
+														| "ArrowUp",
+													imageWidth,
+													imageHeight,
+													event.shiftKey,
+													event.altKey,
 												);
+												annotator?.updateAnnotation({
+													...annotation,
+													target: {
+														...annotation.target,
+														selector: { ...selector, geometry },
+													},
+												});
+											}}
+											data-annotation-id={annotation.id}
+											aria-pressed={selectedId === annotation.id}
+											title={label || "Add a label"}
+											className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-secondary focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:min-h-9"
+										>
+											<span className="grid size-5 shrink-0 place-items-center rounded bg-primary-light text-tiny font-medium tabular-nums text-primary">
+												{number}
+											</span>
+											<span
+												className={`truncate ${label ? "font-medium" : "text-neutral-dark"}`}
+											>
+												{label || "Add a label…"}
+											</span>
+										</button>
+										<button
+											type="button"
+											onClick={async () => {
+												if (label) {
+													const confirmed =
+														await AnnotationDeleteConfirmation.call({});
+													if (!confirmed) return;
+												}
 
-											annotator?.removeAnnotation(annotation.id);
-											requestAnimationFrame(() =>
-												target?.focus({ preventScroll: true }),
-											);
-										}}
-										aria-label={`Delete annotation ${number}${label ? `: ${label}` : ""}`}
-										className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-md text-neutral-dark transition-colors hover:bg-error-light hover:text-error focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
-									>
-										<Trash2 aria-hidden="true" className="size-3.5" />
-									</button>
-								</li>
-							);
-						})}
-					</ul>
-				</>
-			)}
+												const row = document
+													.querySelector<HTMLButtonElement>(
+														`[data-annotation-id="${CSS.escape(annotation.id)}"]`,
+													)
+													?.closest("li");
+												const target =
+													row?.nextElementSibling?.querySelector<HTMLButtonElement>(
+														"[data-annotation-id]",
+													) ??
+													row?.previousElementSibling?.querySelector<HTMLButtonElement>(
+														"[data-annotation-id]",
+													) ??
+													document.querySelector<HTMLHeadingElement>(
+														"[data-annotations-heading]",
+													);
+
+												annotator?.removeAnnotation(annotation.id);
+												requestAnimationFrame(() =>
+													target?.focus({ preventScroll: true }),
+												);
+											}}
+											aria-label={`Delete annotation ${number}${label ? `: ${label}` : ""}`}
+											className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-md text-neutral-dark transition-colors hover:bg-error-light hover:text-error focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
+										>
+											<Trash2 aria-hidden="true" className="size-3.5" />
+										</button>
+									</li>
+								);
+							})}
+						</ul>
+					</>
+				)}
+			</CollapsiblePanel>
 		</section>
-	);
-};
-
-const MobileInspectorToggle = ({
-	isOpen,
-	onToggle,
-}: {
-	isOpen: boolean;
-	onToggle: () => void;
-}) => {
-	const annotations = useAnnotations();
-
-	return (
-		<button
-			type="button"
-			aria-expanded={isOpen}
-			aria-controls="photo-inspector-content"
-			onClick={onToggle}
-			className="flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent lg:hidden [@media(max-height:34rem)_and_(min-width:40rem)]:hidden"
-		>
-			<span className="flex-1">Annotations</span>
-			<output className="rounded bg-primary-light px-2 py-0.5 text-xs tabular-nums text-primary">
-				{annotations.length}
-			</output>
-			{isOpen ? (
-				<ChevronDown aria-hidden="true" className="size-4" />
-			) : (
-				<ChevronUp aria-hidden="true" className="size-4" />
-			)}
-		</button>
 	);
 };
 
@@ -706,9 +711,13 @@ const ImageAnnotationEditor = ({
 	photoDetails,
 }: ImageAnnotationEditorProps) => {
 	const [zoom, setZoom] = useState(1);
-	const [isMobileInspectorOpen, setIsMobileInspectorOpen] = useState(true);
 	const [annotationSortOrder, setAnnotationSortOrder] =
 		useState<AnnotationSortOrder>("newest");
+	const [annotationsCollapsedState, setAnnotationsCollapsed] = useState(false);
+	const isSideBySide = useMediaQuery(
+		"(min-width: 64rem), (min-width: 40rem) and (max-height: 34rem)",
+	);
+	const annotationsCollapsed = !isSideBySide && annotationsCollapsedState;
 	const [isPinching, setIsPinching] = useState(false);
 	const [fitWidth, setFitWidth] = useState<number | null>(null);
 	const photoScrollerRef = useRef<HTMLDivElement>(null);
@@ -850,6 +859,11 @@ const ImageAnnotationEditor = ({
 		fitWidth === null
 			? `min(100cqw, ${(imageWidth / imageHeight) * 100}cqh)`
 			: fitWidth * zoom;
+	const workspaceClassName = [
+		"grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_auto] overflow-hidden",
+		"lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)]",
+		"[@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[minmax(0,1fr)_17rem] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-[minmax(0,1fr)]",
+	].join(" ");
 
 	return (
 		<Annotorious>
@@ -858,21 +872,19 @@ const ImageAnnotationEditor = ({
 				imageWidth={imageWidth}
 				imageHeight={imageHeight}
 			/>
-			<div
-				className={`grid min-h-0 min-w-0 flex-1 overflow-hidden transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${isMobileInspectorOpen ? "grid-rows-[minmax(0,1fr)_min(50dvh,24rem)]" : "grid-rows-[minmax(0,1fr)_3.5rem]"} lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[minmax(0,1fr)_17rem] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-[minmax(0,1fr)]`}
-			>
+			<div className={workspaceClassName}>
 				<section
 					aria-label="Photo canvas"
 					className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-surface-muted"
 				>
 					<div className="flex min-h-11 items-center justify-end border-b border-border/60 bg-surface px-3 py-2 sm:px-4">
-						<p className="m-0 min-w-0 flex-1 whitespace-normal text-right text-xs leading-4 text-neutral-dark">
-							<span className="inline [@media(pointer:coarse)]:hidden">
-								Select a box to move or resize · Drag empty space to draw
-							</span>
-							<span className="hidden [@media(pointer:coarse)]:inline">
+						<p className="m-0 min-w-0 flex-1 whitespace-normal text-left text-xs leading-4 text-neutral-dark lg:text-right">
+							<span className="inline lg:hidden">
 								Drag empty space to draw · Drag a box to move · Tap a box to
 								resize
+							</span>
+							<span className="hidden lg:inline">
+								Select a box to move or resize · Drag empty space to draw
 							</span>
 						</p>
 					</div>
@@ -919,36 +931,29 @@ const ImageAnnotationEditor = ({
 				</section>
 				<aside
 					aria-label="Photo inspector"
-					className="min-h-0 min-w-0 overflow-hidden border-t border-border/60 bg-surface text-left lg:flex lg:flex-col lg:border-l lg:border-t-0 [@media(max-height:34rem)_and_(min-width:40rem)]:flex [@media(max-height:34rem)_and_(min-width:40rem)]:flex-col [@media(max-height:34rem)_and_(min-width:40rem)]:border-l [@media(max-height:34rem)_and_(min-width:40rem)]:border-t-0 [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-y-auto"
+					className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-border/60 bg-surface text-left lg:border-l lg:border-t-0 [@media(max-height:34rem)_and_(min-width:40rem)]:border-l [@media(max-height:34rem)_and_(min-width:40rem)]:border-t-0 [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-y-auto"
 				>
-					<MobileInspectorToggle
-						isOpen={isMobileInspectorOpen}
-						onToggle={() => setIsMobileInspectorOpen((open) => !open)}
-					/>
 					<div
 						id="photo-inspector-content"
-						className={
-							isMobileInspectorOpen
-								? "flex min-h-0 flex-col overflow-hidden lg:flex-1 [@media(max-height:34rem)_and_(min-width:40rem)]:flex-none [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-visible"
-								: "hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden [@media(max-height:34rem)_and_(min-width:40rem)]:flex [@media(max-height:34rem)_and_(min-width:40rem)]:min-h-0 [@media(max-height:34rem)_and_(min-width:40rem)]:flex-none [@media(max-height:34rem)_and_(min-width:40rem)]:flex-col [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-visible"
-						}
+						className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-1 [@media(max-height:34rem)_and_(min-width:40rem)]:flex-none [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-visible"
 					>
-						<details className="group shrink-0 border-b border-border/60">
-							<summary className="flex min-h-12 cursor-pointer list-none items-center px-4 text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
-								<span className="flex-1">Photo details</span>
-								<ChevronDown
-									aria-hidden="true"
-									className="size-4 text-neutral-dark transition-transform duration-200 ease-out group-open:rotate-180 motion-reduce:transition-none"
-								/>
-							</summary>
-							{photoDetails}
-						</details>
+						<div className="order-2 shrink-0 border-b border-border/60 lg:order-1 [@media(max-height:34rem)_and_(min-width:40rem)]:order-1">
+							<CollapsiblePanel
+								label="Photo details"
+								defaultOpen={isSideBySide}
+							>
+								{photoDetails}
+							</CollapsiblePanel>
+						</div>
 						<AnnotationList
 							draftStatus={draftStatus}
 							sortOrder={annotationSortOrder}
 							setSortOrder={setAnnotationSortOrder}
 							imageWidth={imageWidth}
 							imageHeight={imageHeight}
+							canCollapse={!isSideBySide}
+							isCollapsed={annotationsCollapsed}
+							setIsCollapsed={setAnnotationsCollapsed}
 						/>
 					</div>
 				</aside>
@@ -963,6 +968,12 @@ const ImageAnnotationEditor = ({
 			{typeof document !== "undefined" &&
 				createPortal(
 					<ImageAnnotationPopup
+						arrow
+						arrowProps={{
+							className: "fill-surface",
+							tipRadius: 3,
+							strokeWidth: 0,
+						}}
 						popup={(props) => (
 							<AnnotationLabelForm key={props.annotation.id} {...props} />
 						)}

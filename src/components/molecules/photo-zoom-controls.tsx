@@ -23,7 +23,7 @@ export const PhotoZoomControls = ({
 		<span className="shrink-0">
 			{imageWidth} × {imageHeight}
 		</span>
-		<fieldset className="m-0 inline-flex shrink-0 items-center gap-1 border-0 p-0">
+		<fieldset className="m-0 hidden shrink-0 items-center gap-1 border-0 p-0 lg:inline-flex">
 			<legend className="sr-only">Photo zoom</legend>
 			<Tooltip>
 				<TooltipTrigger asChild>

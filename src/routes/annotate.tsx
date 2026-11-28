@@ -47,7 +47,11 @@ const AnnotatePage = () => {
 		void loadPhotoDraft(id).then(
 			(loadedDraft) => {
 				if (ignore) return;
-				setDraft(loadedDraft ?? null);
+				if (!loadedDraft) {
+					void navigate({ to: "/capture", replace: true });
+					return;
+				}
+				setDraft(loadedDraft);
 				setIsLoading(false);
 			},
 			(error: unknown) => {
@@ -61,7 +65,7 @@ const AnnotatePage = () => {
 		return () => {
 			ignore = true;
 		};
-	}, []);
+	}, [navigate]);
 
 	useEffect(() => {
 		if (!draft) return;
@@ -112,7 +116,9 @@ const AnnotatePage = () => {
 				<h1 className="sr-only">Photo annotations</h1>
 			</header>
 			<main className="flex min-h-0 flex-1 flex-col">
-				{isLoading ? (
+				{isLoading ||
+				(!draft && draftStatus !== "error") ||
+				(draft && !photoUrl) ? (
 					<PhotoRestorePlaceholder />
 				) : draft && photoUrl ? (
 					<ImageAnnotationEditor

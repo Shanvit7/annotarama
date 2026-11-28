@@ -23,7 +23,7 @@ pnpm install
 pnpm dev
 ```
 
-Open <http://localhost:3000>.
+Open <http://localhost:3000>. React Scan is opt-in: run `VITE_REACT_SCAN=true pnpm dev` when profiling renders; normal development runs without its hook instrumentation.
 
 ## Quality checks
 

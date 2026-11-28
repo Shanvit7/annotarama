@@ -11,6 +11,7 @@ await page.cdp("Emulation.setTouchEmulationEnabled", { enabled: false });
 // The SSR button can precede hydration; canvas dimensions are set on mount.
 await page.waitForFunction(() => document.querySelector('[aria-label="Capture an image"] canvas[width]') || document.querySelector('[aria-label="Photo inspector"]'));
 await page.evaluate(() => {
+	document.querySelector("#react-scan-root")?.remove();
 	const canvas = document.createElement("canvas");
 	canvas.width = 1080;
 	canvas.height = 1920;
@@ -53,6 +54,7 @@ assert.equal(await visibleGestureGuidance(), "Select a box to move or resize · 
 await page.click('summary:has-text("Photo details")');
 const photoDetails = await page.evaluate(() => document.querySelector('[aria-label="Photo inspector"]').textContent);
 for (const field of ["Photo details", "Photo quality", "1080 × 1920", "File size", "Live focus", "Live lighting", "Live stability"]) assert.ok(photoDetails.includes(field), `missing ${field} in ${photoDetails}`);
+await page.click('summary:has-text("Photo details")');
 
 const imageBounds = async () => page.evaluate(() => {
 	const r = document.querySelector('img[alt^="Captured scene"]').getBoundingClientRect();
@@ -93,9 +95,12 @@ assert.ok(await page.evaluate(() => document.activeElement.matches("[data-annota
 await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
 await page.cdp("Emulation.setTouchEmulationEnabled", { enabled: true });
 assert.equal(await visibleGestureGuidance(), "Drag empty space to draw · Drag a box to move · Tap a box to resize");
-if (await page.evaluate(() => document.querySelector('button[aria-controls="photo-inspector-content"]').getAttribute("aria-expanded") === "false")) {
-	await page.click('button[aria-controls="photo-inspector-content"]');
-}
+assert.equal(
+	await page.evaluate(() => Boolean(document.querySelector('[role="slider"]')?.getClientRects().length)),
+	false,
+	"phone inspector has no resizing control",
+);
+assert.equal(await page.evaluate(() => !!document.querySelector('button[aria-controls="photo-inspector-content"]')), false, "no duplicate mobile Annotations collapse control");
 const firstAnnotationId = await page.evaluate(() =>
 	document
 		.querySelector('[aria-label^="Edit label for annotation 1: Crack near mounting hole"]')
@@ -113,7 +118,7 @@ const touchStart = {
 await page.cdp("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [touchStart] });
 await page.cdp("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: touchStart.x + 35, y: touchStart.y + 35 }] });
 await page.cdp("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-await page.waitForFunction(() => document.querySelector('[aria-label="Annotations"]').textContent.includes("Changes saved on this tab."));
+await page.waitForFunction(() => document.querySelector('[aria-label="Annotations"]').textContent.includes("Changes saved for this session."));
 const touchAfter = await firstAnnotationBounds();
 assert.ok(touchAfter.x > touchBefore.x + 10 && touchAfter.y > touchBefore.y + 10, `touch drag moves existing box: ${JSON.stringify({ touchBefore, touchAfter })}`);
 assert.equal(await page.evaluate(() => document.querySelectorAll("[data-annotation-number]").length), 1, "moving by touch does not draw another box");
@@ -148,13 +153,6 @@ for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]
 		const bounds = image.getBoundingClientRect();
 		return bounds.width <= scroller.clientWidth + 1 && bounds.height <= scroller.clientHeight + 1;
 	});
-	if (width === 320 && height === 568) {
-		const photoWidth = await page.evaluate(() => document.querySelector('img[alt^="Captured scene"]').getBoundingClientRect().width);
-		if (photoWidth < 80) {
-			await page.click('button[aria-controls="photo-inspector-content"]');
-			await page.waitForFunction(() => document.querySelector('img[alt^="Captured scene"]').getBoundingClientRect().width >= 80);
-		}
-	}
 	const bounds = await page.evaluate(() => {
 		const canvas = document.querySelector('[aria-label="Photo canvas"]').getBoundingClientRect();
 		const inspector = document.querySelector('[aria-label="Photo inspector"]').getBoundingClientRect();
@@ -175,8 +173,20 @@ for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]
 		};
 	});
 	const docked = width >= 1024 || (width >= 640 && height <= 544);
+	const sectionOrder = await page.evaluate(() => {
+		const inspector = document.querySelector('[aria-label="Photo inspector"]');
+		return {
+			annotationsTop: inspector.querySelector('[aria-label="Annotations"]').getBoundingClientRect().top,
+			detailsTop: inspector.querySelector("details").getBoundingClientRect().top,
+			sliderVisible: Boolean(inspector.querySelector('[role="slider"]')?.getClientRects().length),
+			zoomControlsVisible: Boolean(document.querySelector('[aria-label="Zoom in"]')?.getClientRects().length),
+		};
+	});
+	assert.equal(sectionOrder.annotationsTop < sectionOrder.detailsTop, !docked, `mobile order puts annotations before details at ${width}×${height}`);
+	assert.equal(sectionOrder.sliderVisible, false, `no redundant inspector slider at ${width}×${height}`);
+	assert.equal(sectionOrder.zoomControlsVisible, width >= 1024, `manual zoom controls are desktop-only at ${width}×${height}`);
 	assert.equal(bounds.overflow, false, `no horizontal overflow at ${width}×${height}`);
-	assert.ok(bounds.listHeight === 0 || bounds.listHeight >= 96, `visible annotation list remains usable at ${width}×${height}`);
+	assert.ok(bounds.listHeight >= 96, `annotation list remains usable at ${width}×${height}`);
 	sawScrollableList ||= bounds.listCanScroll;
 	assert.ok(bounds.imageWidth >= 80 && bounds.imageHeight >= 130, `canvas remains usable at ${width}×${height}: ${bounds.imageWidth}×${bounds.imageHeight}`);
 	assert.ok(Math.abs(bounds.imageWidth / bounds.imageHeight - 9 / 16) < 0.01, "image aspect ratio unchanged");
@@ -250,9 +260,6 @@ for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]
 		y: Math.abs(bounds.markerY - markerPosition.y) * bounds.imageHeight,
 	};
 	assert.ok(markerDrift.x < 4 && markerDrift.y < 4, `numbered marker stays aligned within 4 screen pixels at ${width}×${height}: ${JSON.stringify(markerDrift)}`);
-	if (!docked && await page.evaluate(() => document.querySelector('button[aria-controls="photo-inspector-content"]').getAttribute("aria-expanded") === "false")) {
-		await page.click('button[aria-controls="photo-inspector-content"]');
-	}
 	await page.click('[aria-label^="Edit label for annotation 17:"]');
 	await page.waitForSelector("textarea");
 	const popup = await page.evaluate(() => {
@@ -268,9 +275,6 @@ for (const [width, height] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]
 assert.ok(sawScrollableList, "long annotation lists scroll when viewport has limited space");
 // Touch drawing, destructive-action confirmation, and same-tab restore.
 await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-if (await page.evaluate(() => document.querySelector('button[aria-controls="photo-inspector-content"]').getAttribute("aria-expanded") === "false")) {
-	await page.click('button[aria-controls="photo-inspector-content"]');
-}
 await page.evaluate(() => { document.querySelector('[aria-label="Photo canvas"]').parentElement.scrollTop = 0; });
 await draw(17, true);
 await saveLabel("Touch annotation");
@@ -288,7 +292,7 @@ await page.waitForFunction(() => document.querySelectorAll("[data-annotation-id]
 console.log("PASS: confirmed deletion");
 await page.waitForFunction(() => document.activeElement.matches("[data-annotation-id]"));
 console.log("PASS: deletion focus return");
-await page.waitForFunction(() => document.querySelector('[aria-label="Annotations"]').textContent.includes("Changes saved on this tab."));
+await page.waitForFunction(() => document.querySelector('[aria-label="Annotations"]').textContent.includes("Changes saved for this session."));
 console.log("PASS: saved status before reload");
 await page.reload();
 await page.waitForFunction(() => document.querySelectorAll("[data-annotation-id]").length === 17);

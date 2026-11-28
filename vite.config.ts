@@ -9,6 +9,8 @@ const routerBasePath = basePath.replace(/\/$/, "") || "/";
 const config = defineConfig({
 	base: basePath,
 	resolve: { tsconfigPaths: true },
+	// Loaded by a head script, outside Start's dependency scan.
+	optimizeDeps: { include: ["react-scan"] },
 	plugins: [
 		tanstackStart({
 			router: { basepath: routerBasePath },

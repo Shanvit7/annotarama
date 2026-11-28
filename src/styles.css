@@ -131,8 +131,20 @@ body {
 
 @layer base {
 	:focus-visible {
-		outline: 0.125rem solid var(--color-accent);
-		outline-offset: 0.125rem;
+		outline: none !important;
+		box-shadow: none !important;
+	}
+
+	:is(button, a, summary, [role="button"], input, textarea, select):focus-visible {
+		background-color: color-mix(
+			in srgb,
+			var(--color-primary) 10%,
+			transparent
+		);
+	}
+
+	:is(input, textarea, select):focus-visible {
+		border-color: var(--color-primary) !important;
 	}
 }
 

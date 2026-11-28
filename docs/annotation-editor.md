@@ -11,7 +11,7 @@ The captured-image editor uses `@annotorious/react` `3.10.0` for rectangle drawi
 ## Implementation
 
 - `src/components/organisms/camera-capture.tsx` renders `ImageAnnotationEditor` only after a photo is captured.
-- The captured stage uses an editor workspace: photo canvas on the left, a docked inspector on the right with photo quality/details above annotations. Gesture guidance distinguishes desktop selection from touch dragging; zoom-out/in controls and a percentage button reset to Fit. Fit shows the whole photo; zoom preserves the photo, centers the view, and scrolls to the edges when enlarged. The percentage is relative to Fit. Annotation geometry stays attached to the image at every zoom level. Phones stack the inspector below the canvas and scroll the workspace. Short landscape screens dock the inspector beside the canvas and scroll it as a whole so quality cannot squeeze annotation rows out of view.
+- The captured stage uses an editor workspace: photo canvas beside an inspector on wide layouts. Desktop and short-landscape inspectors place photo details above annotations; phone inspectors place the annotation list first and photo details after it. Gesture guidance distinguishes desktop selection from touch dragging; mobile hides zoom buttons; pinch zooms and single-finger pans. Desktop keeps zoom buttons and a percentage reset to Fit. Fit shows the whole photo; zoom preserves the photo, centers the view, and scrolls to the edges when enlarged. The percentage is relative to Fit. Annotation geometry stays attached to the image at every zoom level. Phones stack the inspector below the canvas and scroll the workspace; short landscape screens dock it beside the canvas and scroll the inspector as a whole.
 - `ImageAnnotator` stays in `tool="rectangle"` and `drawingMode="drag"`; a separate draw/edit toggle was unnecessary because Annotorious already moves and resizes selected boxes. On desktop, select a box before dragging or resizing; an unselected drag draws a new annotation. On touch, `TouchAnnotationDrag` moves an existing box without requiring a prior tap; a tap selects the box and shows Annotorious resize handles.
 - The image and overlay share a size-fitting container computed from captured image dimensions. Both retain the exact image aspect ratio without cropping or internal letterboxing; do not use `object-cover`.
 - `src/lib/photo-drafts.ts` stores the captured photo blob, dimensions, quality snapshot, and full Annotorious annotation objects in Dexie/IndexedDB. Annotation changes debounce for 250 ms and flush on `pagehide`; same-tab refresh restores the photo and labels. Retake deletes the tab's draft.
@@ -22,7 +22,7 @@ The captured-image editor uses `@annotorious/react` `3.10.0` for rectangle drawi
 
 ## Limits
 
-- Rectangles only. No polygons, freehand marks, zoomable imagery, collaboration, or export.
+- Rectangles only. No polygons, freehand marks, deep-zoom imagery, collaboration, or export.
 - Drafts are local to one tab and device; there is no account, server sync, or permanent archive. Closing a tab queues deletion for the next visit to this origin. Browser shutdown can interrupt `pagehide`, so cleanup is best-effort; stale records expire after 30 days.
 - Retaking explicitly deletes the current tab's saved photo and annotations.
 - Keyboard users can navigate/select/delete from the annotation list and edit labels.
@@ -55,4 +55,4 @@ Manual checks on desktop and touch device:
 3. Refresh the same tab; confirm photo, dimensions, labels, and rectangle geometry restore.
 4. Open the app in a separate tab; confirm it does not load the first tab's draft. Retake in the original tab and confirm its draft is deleted.
 5. Close a tab with a draft, then revisit any route on this origin after the grace period; confirm its queued draft is deleted.
-6. Resize viewport and confirm boxes stay aligned. Tab through list and popup controls; confirm visible focus. Verify direct touch move and resize on a physical device.
+6. Resize viewport and confirm boxes stay aligned. Tab through list and popup controls; confirm keyboard focus is indicated by the background tint and, on text fields, border color. Verify direct touch move and resize on a physical device.

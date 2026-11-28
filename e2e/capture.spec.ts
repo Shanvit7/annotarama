@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
 test("capture, label annotation, and restore after refresh", async ({ page }) => {
+	const runtimeErrors: string[] = [];
+	page.on("pageerror", (error) => runtimeErrors.push(error.stack ?? error.message));
+	page.on("console", (message) => {
+		if (message.type() === "error") runtimeErrors.push(message.text());
+	});
+
 	await page.addInitScript(() => {
 		const canvas = document.createElement("canvas");
 		canvas.width = 640;
@@ -25,7 +31,11 @@ test("capture, label annotation, and restore after refresh", async ({ page }) =>
 		];
 	});
 
-	await page.goto("/capture");
+	await page.goto("/");
+	await page.getByRole("link", { name: "Get started" }).click();
+	await expect(page.getByRole("button", { name: "Start camera" })).toBeVisible();
+	await page.goto("/annotate");
+	await expect(page).toHaveURL(/\/capture$/);
 	await page.getByRole("button", { name: "Start camera" }).click();
 	await page.getByRole("button", { name: "Capture photo" }).click();
 	await expect(page.getByRole("heading", { name: /Photo quality/ })).toBeVisible();
@@ -45,16 +55,44 @@ test("capture, label annotation, and restore after refresh", async ({ page }) =>
 
 	const labelEditor = page.getByRole("form", { name: "Edit annotation label" });
 	await expect(labelEditor).toBeVisible();
+	await expect(labelEditor.getByText("1", { exact: true })).toBeVisible();
 	await labelEditor.getByRole("textbox", { name: "Annotation label" }).fill("Crack near mounting hole");
 	await labelEditor.getByRole("button", { name: "Save label" }).click();
 	const saveStatus = page.getByText("Saving changes…", { exact: true });
 	await expect(saveStatus).toBeVisible();
-	await expect(page.getByText("Changes saved on this tab.", { exact: true })).toBeVisible();
+	await expect(page.getByText("Changes saved for this session.", { exact: true })).toBeVisible();
 	await expect(
 		page.getByRole("button", { name: "Edit label for annotation 1: Crack near mounting hole" }),
 	).toBeVisible();
 
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect(page.getByText("Drag empty space to draw · Drag a box to move · Tap a box to resize", { exact: true })).toBeVisible();
+	await expect(page.getByText("Select a box to move or resize · Drag empty space to draw", { exact: true })).toBeHidden();
+	await expect(photo).toBeVisible();
+	await expect(page.getByText("640 × 480", { exact: true }).first()).toBeVisible();
+	const canvasRegion = page.getByRole("region", { name: "Photo canvas" });
+	const expandedCanvas = await canvasRegion.boundingBox();
+	expect(expandedCanvas).not.toBeNull();
+	if (!expandedCanvas) throw new Error("Photo canvas has no visible bounds");
+	await page.getByRole("button", { name: "Collapse annotations" }).click();
+	await expect(page.getByRole("button", { name: "Expand annotations" })).toHaveAttribute(
+		"aria-expanded",
+		"false",
+	);
+	await expect
+		.poll(async () => (await canvasRegion.boundingBox())?.height ?? 0)
+		.toBeGreaterThan(expandedCanvas.height);
+	await expect(page.getByRole("button", { name: "Zoom in" })).toBeHidden();
+	await expect(page.getByRole("button", { name: "Zoom out" })).toBeHidden();
+	await expect(page.getByRole("button", { name: "Fit photo to view" })).toBeHidden();
+	await expect(page.getByRole("slider", { name: "Photo and annotation split" })).toHaveCount(0);
+	await page.setViewportSize({ width: 1280, height: 720 });
+	await expect(page.getByText("Select a box to move or resize · Drag empty space to draw", { exact: true })).toBeVisible();
+	await expect(page.getByText("Drag empty space to draw · Drag a box to move · Tap a box to resize", { exact: true })).toBeHidden();
+	await expect(page.getByRole("button", { name: "Zoom in" })).toBeVisible();
+
 	await page.reload();
 	await expect(page.getByRole("button", { name: "Edit label for annotation 1: Crack near mounting hole" })).toBeVisible();
 	await expect(page.getByAltText("Captured scene")).toBeVisible();
+	expect(runtimeErrors).toEqual([]);
 });

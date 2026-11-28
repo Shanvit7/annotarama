@@ -1,13 +1,14 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
+import { LoaderCircle } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
-import { APP_FAVICON_URL } from "@/lib/constants";
+import { APP_FAVICON_URL, SUPPORT_EMAIL } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 
 type RouteStatePageProps = {
 	code: string;
 	title: string;
-	description: string;
+	description: ReactNode;
 	children: ReactNode;
 };
 
@@ -51,6 +52,18 @@ const RouteStatePage = ({
 	</main>
 );
 
+export const RoutePendingPage = () => (
+	<main className="grid min-h-svh place-items-center bg-surface">
+		<output className="flex items-center gap-3 text-sm font-medium text-secondary">
+			<LoaderCircle
+				aria-hidden="true"
+				className="size-5 animate-spin text-primary motion-reduce:animate-none"
+			/>
+			<span>Loading page…</span>
+		</output>
+	</main>
+);
+
 export const RouteNotFoundPage = () => (
 	<RouteStatePage
 		code="404"
@@ -75,7 +88,19 @@ export const RouteErrorPage = ({ error, reset }: ErrorComponentProps) => {
 		<RouteStatePage
 			code="Error"
 			title="We couldn’t load this page."
-			description="Try again. If the problem continues, return to Annotarama."
+			description={
+				<>
+					Sorry about this. We’ve notified our team, and they’re looking into
+					it. If the problem continues, email us at{" "}
+					<a
+						href={`mailto:${SUPPORT_EMAIL}`}
+						className="font-semibold text-primary underline decoration-accent underline-offset-4 transition-colors hover:text-primary-hover motion-reduce:transition-none"
+					>
+						{SUPPORT_EMAIL}
+					</a>
+					, and we’ll look into it.
+				</>
+			}
 		>
 			<button
 				type="button"
