@@ -76,44 +76,6 @@ const applyMaxResolution = async (track: MediaStreamTrack) => {
 	}
 };
 
-type PhotoCapabilities = {
-	imageWidth?: { max?: number };
-	imageHeight?: { max?: number };
-};
-
-type ImageCaptureLike = {
-	getPhotoCapabilities?: () => Promise<PhotoCapabilities>;
-	takePhoto: (options?: {
-		imageWidth?: number;
-		imageHeight?: number;
-	}) => Promise<Blob>;
-};
-
-// ImageCapture gives full-sensor stills; browsers without it fall back to a video frame.
-const takeNativePhoto = async (track: MediaStreamTrack) => {
-	const ImageCaptureCtor = (
-		globalThis as {
-			ImageCapture?: new (track: MediaStreamTrack) => ImageCaptureLike;
-		}
-	).ImageCapture;
-	if (!ImageCaptureCtor) return null;
-
-	try {
-		const capture = new ImageCaptureCtor(track);
-		const capabilities = await capture.getPhotoCapabilities?.();
-		const max = readTrackMaxResolution(track);
-		const imageWidth = capabilities?.imageWidth?.max || max?.width;
-		const imageHeight = capabilities?.imageHeight?.max || max?.height;
-		const blob = await capture.takePhoto(
-			imageWidth && imageHeight ? { imageWidth, imageHeight } : undefined,
-		);
-		return blob.size > 0 ? blob : null;
-	} catch (nativeError) {
-		logger.warn("Native photo capture unavailable", nativeError);
-		return null;
-	}
-};
-
 const captureVideoFrame = async (
 	video: HTMLVideoElement,
 	width: number,
@@ -136,22 +98,6 @@ const captureVideoFrame = async (
 			0.92,
 		);
 	});
-};
-
-// Report the blob's real dimensions so the UI never claims a resolution the file does not have.
-const readPhotoSize = async (
-	blob: Blob,
-	fallback: { width: number; height: number },
-) => {
-	try {
-		const bitmap = await createImageBitmap(blob);
-		const size = { width: bitmap.width, height: bitmap.height };
-		bitmap.close();
-		return size;
-	} catch (bitmapError) {
-		logger.warn("Could not read photo dimensions", bitmapError);
-		return fallback;
-	}
 };
 
 export const mapCameraError = (error: unknown): CameraError => {
@@ -408,15 +354,12 @@ export const useCamera = () => {
 		setStatus("capturing");
 
 		try {
-			const blob =
-				(await takeNativePhoto(track)) ??
-				(await captureVideoFrame(video, frameWidth, frameHeight));
-			const { width, height } = await readPhotoSize(blob, {
+			const blob = await captureVideoFrame(video, frameWidth, frameHeight);
+			const capturedPhoto = {
+				blob,
 				width: frameWidth,
 				height: frameHeight,
-			});
-
-			const capturedPhoto = { blob, width, height };
+			};
 			photoRef.current = capturedPhoto;
 			setPhoto(capturedPhoto);
 			requestIdRef.current += 1;

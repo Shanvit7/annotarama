@@ -35,11 +35,15 @@ The metric/sampler suite covers luma conversion, aspect ratio, synthetic sharp/b
 With `pnpm dev` running and Ego Browser installed:
 
 ```sh
-ego-browser nodejs < scripts/check-live-camera.mjs
-ego-browser nodejs < scripts/check-annotation-ui.mjs
+pnpm test:ego
+
+# Or run checks individually:
+ego-browser nodejs < scripts/ego-browser/check-live-camera.mjs
+ego-browser nodejs < scripts/ego-browser/check-annotation-ui.mjs
+ego-browser nodejs < scripts/ego-browser/check-ascii-backdrop.mjs
 ```
 
-The browser smoke check uses a deterministic canvas-backed camera and mocked capabilities/errors, without requesting a real device. It checks balanced warmup, capture while conditions deteriorate or become unavailable, torch on/off/absent, capture/retake and retained quality details, permission-denied and unsupported-camera UI, and layouts at 390×844, 320×568, 844×390, 640×360 and 320×480. The annotation UI check also verifies photo metadata and live-check values in the captured summary. Inspect `/tmp/annotarama-live-quality.png`, then close the printed task space with `task.finish({ keep: [] })` in a separate Ego Browser call. Real permission prompts are not exercised by these mocks.
+The browser checks use deterministic canvas-backed media and mocked capabilities/errors, without requesting a real device. They cover camera switching, torch, capture/retake, permission errors, responsive layouts, photo metadata, labels, annotations, and same-tab restore. Successful runs close their isolated task spaces; failures leave the space open for diagnosis. Screenshots are saved under `/tmp`. Real permission prompts are not exercised by these mocks. See `scripts/ego-browser/README.md` for coverage and setup.
 
 ### Results and limits
 

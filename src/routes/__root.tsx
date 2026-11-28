@@ -3,6 +3,7 @@ import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Toaster } from "@yusufceng1z/ding-react";
 import { useEffect } from "react";
 import { AnnotationDeleteConfirmation } from "@/components/molecules/annotation-delete-confirmation";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { APP_FAVICON_URL, APP_IS_DEVELOPMENT } from "@/lib/constants";
 import {
 	getOrCreatePhotoSessionId,
@@ -66,10 +67,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<HeadContent />
 			</head>
 			<body>
-				<PhotoDraftCleanup />
-				{children}
-				<AnnotationDeleteConfirmation />
-				<Toaster position="top-center" theme="light" />
+				<TooltipProvider delayDuration={300}>
+					<PhotoDraftCleanup />
+					{children}
+					<AnnotationDeleteConfirmation />
+					<Toaster position="top-center" theme="light" />
+				</TooltipProvider>
 				<Scripts />
 			</body>
 		</html>

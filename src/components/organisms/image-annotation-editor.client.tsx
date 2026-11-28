@@ -12,13 +12,13 @@ import type {
 	Annotator,
 	ImageAnnotation,
 	PopupProps,
+	Rectangle,
 	RectangleGeometry,
 } from "@annotorious/react";
 import {
 	ArrowUp,
 	ChevronDown,
 	ChevronUp,
-	Move,
 	ScanSearch,
 	SquareDashedMousePointer,
 	Trash2,
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import {
 	type ReactNode,
+	type RefObject,
 	useEffect,
 	useLayoutEffect,
 	useRef,
@@ -34,7 +35,11 @@ import {
 import { createPortal } from "react-dom";
 import { AnnotationDeleteConfirmation } from "@/components/molecules/annotation-delete-confirmation";
 import { PhotoZoomControls } from "@/components/molecules/photo-zoom-controls";
-import { SegmentedToggle } from "@/components/molecules/segmented-toggle";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { adjustRectangleForKey } from "@/lib/annotation-keyboard";
 import { logger } from "@/lib/logger";
 import type { PhotoDraftStatus } from "@/lib/photo-drafts";
@@ -153,15 +158,19 @@ const AnnotationLabelForm = ({
 				</p>
 			)}
 			<div className="flex items-center justify-between border-t border-border/60 px-2 py-1.5">
-				<button
-					type="button"
-					onClick={deleteAnnotation}
-					aria-label={`Delete annotation${body?.value ? `: ${body.value}` : ""}`}
-					title="Delete annotation"
-					className="grid size-11 cursor-pointer place-items-center rounded-full text-error transition-colors hover:bg-error-light focus-visible:outline-2 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
-				>
-					<Trash2 aria-hidden="true" className="size-4" />
-				</button>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<button
+							type="button"
+							onClick={deleteAnnotation}
+							aria-label={`Delete annotation${body?.value ? `: ${body.value}` : ""}`}
+							className="grid size-11 cursor-pointer place-items-center rounded-full text-error transition-colors hover:bg-error-light focus-visible:outline-2 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
+						>
+							<Trash2 aria-hidden="true" className="size-4" />
+						</button>
+					</TooltipTrigger>
+					<TooltipContent>Delete annotation</TooltipContent>
+				</Tooltip>
 				<button
 					type="submit"
 					aria-label="Save label"
@@ -176,6 +185,19 @@ const AnnotationLabelForm = ({
 };
 
 type AnnotationSortOrder = "newest" | "oldest";
+
+const getOrderedAnnotations = (
+	annotations: ImageAnnotation[],
+	sortOrder: AnnotationSortOrder,
+) => {
+	const numberedAnnotations = annotations.map((annotation, index) => ({
+		annotation,
+		number: index + 1,
+	}));
+	return sortOrder === "newest"
+		? numberedAnnotations.reverse()
+		: numberedAnnotations;
+};
 
 const AnnotationList = ({
 	draftStatus,
@@ -194,8 +216,7 @@ const AnnotationList = ({
 	const annotations = useAnnotations();
 	const { selected } = useSelection();
 	const selectedId = selected[0]?.annotation.id;
-	const orderedAnnotations =
-		sortOrder === "newest" ? [...annotations].reverse() : annotations;
+	const orderedAnnotations = getOrderedAnnotations(annotations, sortOrder);
 	const removeAnnotation = async (
 		annotation: ImageAnnotation,
 		label: string | undefined,
@@ -295,7 +316,7 @@ const AnnotationList = ({
 						edits its label. Delete removes it.
 					</p>
 					<ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain px-2 pb-2">
-						{orderedAnnotations.map((annotation, index) => {
+						{orderedAnnotations.map(({ annotation, number }) => {
 							const label = annotation.bodies
 								.find((body) => body.purpose === "commenting")
 								?.value?.trim();
@@ -308,7 +329,7 @@ const AnnotationList = ({
 									<button
 										type="button"
 										onClick={() => annotator?.setSelected(annotation.id)}
-										aria-label={`Edit label for annotation ${index + 1}${label ? `: ${label}` : ""}`}
+										aria-label={`Edit label for annotation ${number}${label ? `: ${label}` : ""}`}
 										aria-describedby="annotation-keyboard-help"
 										aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Delete Enter"
 										onKeyDown={(event) => {
@@ -350,7 +371,7 @@ const AnnotationList = ({
 										className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-secondary focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:min-h-9"
 									>
 										<span className="grid size-5 shrink-0 place-items-center rounded bg-primary-light text-tiny font-medium tabular-nums text-primary">
-											{index + 1}
+											{number}
 										</span>
 										<span
 											className={`truncate ${label ? "font-medium" : "text-neutral-dark"}`}
@@ -388,7 +409,7 @@ const AnnotationList = ({
 												target?.focus({ preventScroll: true }),
 											);
 										}}
-										aria-label={`Delete annotation ${index + 1}${label ? `: ${label}` : ""}`}
+										aria-label={`Delete annotation ${number}${label ? `: ${label}` : ""}`}
 										className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-md text-neutral-dark transition-colors hover:bg-error-light hover:text-error focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent [@media(pointer:fine)]:size-9"
 									>
 										<Trash2 aria-hidden="true" className="size-3.5" />
@@ -418,7 +439,7 @@ const MobileInspectorToggle = ({
 			aria-expanded={isOpen}
 			aria-controls="photo-inspector-content"
 			onClick={onToggle}
-			className="flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent lg:hidden"
+			className="flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm font-semibold text-secondary focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent lg:hidden [@media(max-height:34rem)_and_(min-width:40rem)]:hidden"
 		>
 			<span className="flex-1">Annotations</span>
 			<output className="rounded bg-primary-light px-2 py-0.5 text-xs tabular-nums text-primary">
@@ -455,25 +476,24 @@ const AnnotationNumberMarkers = ({
 	sortOrder,
 }: AnnotationNumberMarkersProps & { sortOrder: AnnotationSortOrder }) => {
 	const annotations = useAnnotations();
-	const orderedAnnotations =
-		sortOrder === "newest" ? [...annotations].reverse() : annotations;
+	const orderedAnnotations = getOrderedAnnotations(annotations, sortOrder);
 
 	return (
 		<div aria-hidden="true" className="pointer-events-none absolute inset-0">
-			{orderedAnnotations.map((annotation, index) => {
+			{orderedAnnotations.map(({ annotation, number }) => {
 				const { minX, minY } = annotation.target.selector.geometry.bounds;
 
 				return (
 					<span
 						key={annotation.id}
-						data-annotation-number={index + 1}
+						data-annotation-number={number}
 						style={{
 							left: `${(minX / imageWidth) * 100}%`,
 							top: `${(minY / imageHeight) * 100}%`,
 						}}
 						className="absolute grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-primary text-tiny font-semibold tabular-nums text-surface shadow-sm ring-1 ring-surface"
 					>
-						{index + 1}
+						{number}
 					</span>
 				);
 			})}
@@ -530,6 +550,151 @@ const AnnotationDraftSync = ({
 	return null;
 };
 
+const TouchAnnotationDrag = ({
+	scrollerRef,
+	imageWidth,
+	imageHeight,
+}: {
+	scrollerRef: RefObject<HTMLDivElement | null>;
+	imageWidth: number;
+	imageHeight: number;
+}) => {
+	const annotator = useAnnotator<Annotator<ImageAnnotation, ImageAnnotation>>();
+
+	useEffect(() => {
+		const scroller = scrollerRef.current;
+		if (!scroller || !annotator) return;
+
+		let drag: {
+			pointerId: number;
+			annotationId: string;
+			annotation: ImageAnnotation;
+			selector: Rectangle;
+			geometry: RectangleGeometry;
+			startX: number;
+			startY: number;
+			imageBounds: DOMRect;
+			moved: boolean;
+		} | null = null;
+
+		const onPointerDown = (event: PointerEvent) => {
+			if (event.pointerType !== "touch") return;
+			if (drag) {
+				if (drag.pointerId !== event.pointerId) {
+					scroller.releasePointerCapture(drag.pointerId);
+					drag = null;
+					event.preventDefault();
+					event.stopPropagation();
+				}
+				return;
+			}
+
+			const target = event.target;
+			if (!(target instanceof Element)) return;
+			const shape = target.closest<SVGGElement>(".a9s-annotation[data-id]");
+			const annotationId = shape?.dataset.id;
+			const annotation = annotationId
+				? annotator.getAnnotationById(annotationId)
+				: undefined;
+			const selector = annotation?.target.selector;
+			if (
+				!annotationId ||
+				!annotation ||
+				selector?.type !== ShapeType.RECTANGLE
+			)
+				return;
+
+			const image = scroller.querySelector("img");
+			if (!image) return;
+			const geometry = selector.geometry as RectangleGeometry;
+			event.preventDefault();
+			event.stopPropagation();
+			annotator.setSelected();
+			drag = {
+				pointerId: event.pointerId,
+				annotationId,
+				annotation,
+				selector: selector as Rectangle,
+				geometry,
+				startX: event.clientX,
+				startY: event.clientY,
+				imageBounds: image.getBoundingClientRect(),
+				moved: false,
+			};
+			scroller.setPointerCapture(event.pointerId);
+		};
+
+		const onPointerMove = (event: PointerEvent) => {
+			if (!drag || drag.pointerId !== event.pointerId) return;
+			event.preventDefault();
+			event.stopPropagation();
+			const deltaX = event.clientX - drag.startX;
+			const deltaY = event.clientY - drag.startY;
+			if (!drag.moved && Math.hypot(deltaX, deltaY) < 4) return;
+			drag.moved = true;
+
+			const { geometry, imageBounds } = drag;
+			const x = Math.max(
+				0,
+				Math.min(
+					imageWidth - geometry.w,
+					geometry.x + (deltaX * imageWidth) / imageBounds.width,
+				),
+			);
+			const y = Math.max(
+				0,
+				Math.min(
+					imageHeight - geometry.h,
+					geometry.y + (deltaY * imageHeight) / imageBounds.height,
+				),
+			);
+			const nextGeometry: RectangleGeometry = {
+				...geometry,
+				x,
+				y,
+				bounds: {
+					minX: x,
+					minY: y,
+					maxX: x + geometry.w,
+					maxY: y + geometry.h,
+				},
+			};
+			annotator.updateAnnotation({
+				...drag.annotation,
+				target: {
+					...drag.annotation.target,
+					selector: { ...drag.selector, geometry: nextGeometry },
+				},
+			});
+		};
+
+		const onPointerUp = (event: PointerEvent) => {
+			if (!drag || drag.pointerId !== event.pointerId) return;
+			event.preventDefault();
+			event.stopPropagation();
+			if (!drag.moved) annotator.setSelected(drag.annotationId);
+			drag = null;
+		};
+
+		const onPointerCancel = (event: PointerEvent) => {
+			if (drag?.pointerId === event.pointerId) drag = null;
+		};
+
+		scroller.addEventListener("pointerdown", onPointerDown, true);
+		scroller.addEventListener("pointermove", onPointerMove, true);
+		scroller.addEventListener("pointerup", onPointerUp, true);
+		scroller.addEventListener("pointercancel", onPointerCancel, true);
+		return () => {
+			scroller.removeEventListener("pointerdown", onPointerDown, true);
+			scroller.removeEventListener("pointermove", onPointerMove, true);
+			scroller.removeEventListener("pointerup", onPointerUp, true);
+			scroller.removeEventListener("pointercancel", onPointerCancel, true);
+		};
+	}, [annotator, imageHeight, imageWidth, scrollerRef]);
+
+	return null;
+};
+
 const ImageAnnotationEditor = ({
 	imageUrl,
 	imageWidth,
@@ -544,7 +709,6 @@ const ImageAnnotationEditor = ({
 	const [isMobileInspectorOpen, setIsMobileInspectorOpen] = useState(true);
 	const [annotationSortOrder, setAnnotationSortOrder] =
 		useState<AnnotationSortOrder>("newest");
-	const [isEditMode, setIsEditMode] = useState(false);
 	const [isPinching, setIsPinching] = useState(false);
 	const [fitWidth, setFitWidth] = useState<number | null>(null);
 	const photoScrollerRef = useRef<HTMLDivElement>(null);
@@ -689,40 +853,27 @@ const ImageAnnotationEditor = ({
 
 	return (
 		<Annotorious>
+			<TouchAnnotationDrag
+				scrollerRef={photoScrollerRef}
+				imageWidth={imageWidth}
+				imageHeight={imageHeight}
+			/>
 			<div
-				className={`grid min-h-0 min-w-0 flex-1 overflow-hidden transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${isMobileInspectorOpen ? "grid-rows-[minmax(0,1fr)_min(50dvh,24rem)]" : "grid-rows-[minmax(0,1fr)_3.5rem]"} lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:lg:grid-cols-[minmax(0,1fr)_17rem]`}
+				className={`grid min-h-0 min-w-0 flex-1 overflow-hidden transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${isMobileInspectorOpen ? "grid-rows-[minmax(0,1fr)_min(50dvh,24rem)]" : "grid-rows-[minmax(0,1fr)_3.5rem]"} lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-cols-[minmax(0,1fr)_17rem] [@media(max-height:34rem)_and_(min-width:40rem)]:grid-rows-[minmax(0,1fr)]`}
 			>
 				<section
 					aria-label="Photo canvas"
 					className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-surface-muted"
 				>
-					<div className="flex min-h-11 items-center justify-between gap-2 border-b border-border/60 bg-surface px-3 sm:px-4">
-						<SegmentedToggle
-							ariaLabel="Annotation mode"
-							value={isEditMode ? "edit" : "draw"}
-							onValueChange={(value) => setIsEditMode(value === "edit")}
-							options={[
-								{
-									value: "draw",
-									label: "Draw boxes",
-									icon: (
-										<SquareDashedMousePointer
-											aria-hidden="true"
-											className="size-3.5"
-										/>
-									),
-								},
-								{
-									value: "edit",
-									label: "Edit boxes",
-									icon: <Move aria-hidden="true" className="size-3.5" />,
-								},
-							]}
-						/>
-						<p className="m-0 min-w-0 flex-1 truncate text-right text-xs text-neutral-dark">
-							{isEditMode
-								? "Select a box · Drag to move or resize"
-								: "Drag to mark · Pinch to zoom"}
+					<div className="flex min-h-11 items-center justify-end border-b border-border/60 bg-surface px-3 py-2 sm:px-4">
+						<p className="m-0 min-w-0 flex-1 whitespace-normal text-right text-xs leading-4 text-neutral-dark">
+							<span className="inline [@media(pointer:coarse)]:hidden">
+								Select a box to move or resize · Drag empty space to draw
+							</span>
+							<span className="hidden [@media(pointer:coarse)]:inline">
+								Drag empty space to draw · Drag a box to move · Tap a box to
+								resize
+							</span>
 						</p>
 					</div>
 					<div className="min-h-0 min-w-0 p-3 sm:p-6 [@media(max-height:34rem)_and_(min-width:40rem)]:p-3">
@@ -738,10 +889,10 @@ const ImageAnnotationEditor = ({
 								}}
 							>
 								<ImageAnnotator
-									containerClassName={`relative size-full [&_.a9s-inner]:fill-primary/5! [&_.a9s-inner]:stroke-primary! [&_.a9s-outer]:hidden! [&_.a9s-inner]:[stroke-width:1px]! [&_.a9s-handle-dot]:stroke-primary! ${isEditMode ? "[&_.a9s-annotationlayer.hover]:cursor-move!" : ""}`}
-									drawingEnabled={!isPinching && !isEditMode}
+									containerClassName="relative size-full [&_.a9s-inner]:fill-primary/5! [&_.a9s-inner]:stroke-primary! [&_.a9s-outer]:hidden! [&_.a9s-inner]:[stroke-width:1px]! [&_.a9s-handle-dot]:stroke-primary! [&_.a9s-annotationlayer.hover]:cursor-move!"
+									drawingEnabled={!isPinching}
 									drawingMode="drag"
-									tool={isEditMode ? undefined : "rectangle"}
+									tool="rectangle"
 								>
 									<img
 										src={imageUrl}
@@ -768,7 +919,7 @@ const ImageAnnotationEditor = ({
 				</section>
 				<aside
 					aria-label="Photo inspector"
-					className="min-h-0 min-w-0 overflow-hidden border-t border-border/60 bg-surface text-left lg:flex lg:flex-col lg:border-l lg:border-t-0"
+					className="min-h-0 min-w-0 overflow-hidden border-t border-border/60 bg-surface text-left lg:flex lg:flex-col lg:border-l lg:border-t-0 [@media(max-height:34rem)_and_(min-width:40rem)]:flex [@media(max-height:34rem)_and_(min-width:40rem)]:flex-col [@media(max-height:34rem)_and_(min-width:40rem)]:border-l [@media(max-height:34rem)_and_(min-width:40rem)]:border-t-0 [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-y-auto"
 				>
 					<MobileInspectorToggle
 						isOpen={isMobileInspectorOpen}
@@ -778,8 +929,8 @@ const ImageAnnotationEditor = ({
 						id="photo-inspector-content"
 						className={
 							isMobileInspectorOpen
-								? "flex min-h-0 flex-col overflow-hidden lg:flex-1"
-								: "hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden"
+								? "flex min-h-0 flex-col overflow-hidden lg:flex-1 [@media(max-height:34rem)_and_(min-width:40rem)]:flex-none [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-visible"
+								: "hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden [@media(max-height:34rem)_and_(min-width:40rem)]:flex [@media(max-height:34rem)_and_(min-width:40rem)]:min-h-0 [@media(max-height:34rem)_and_(min-width:40rem)]:flex-none [@media(max-height:34rem)_and_(min-width:40rem)]:flex-col [@media(max-height:34rem)_and_(min-width:40rem)]:overflow-visible"
 						}
 					>
 						<details className="group shrink-0 border-b border-border/60">

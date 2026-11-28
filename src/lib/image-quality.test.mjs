@@ -451,6 +451,16 @@ test("timer fallback works, interruption clears status, cleanup tolerates Strict
 	assert.equal(f.frames.size, 0);
 });
 
+test("camera that never produces its first frame becomes unavailable, then recovers", (t) => {
+	const f = fixture(t);
+	f.video.readyState = 1;
+	f.poll(2_200);
+	assert.equal(f.latest().unavailable, true);
+	f.video.readyState = 2;
+	f.frame();
+	assert.equal(f.latest().unavailable, false);
+});
+
 test("timer fallback never recovers from a frozen frame until media time advances", (t) => {
 	const f = fixture(t, false);
 	for (let i = 0; i < 4; i++) f.frame();

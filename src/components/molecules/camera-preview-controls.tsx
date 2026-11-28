@@ -6,6 +6,11 @@ import {
 	Zap,
 	ZapOff,
 } from "lucide-react";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { CameraStatus } from "@/hooks/use-camera";
 
 type CameraPreviewControlsProps = {
@@ -23,16 +28,17 @@ type CameraPreviewControlsProps = {
 	onTorch: () => void;
 };
 
-const CapturingOverlay = () => (
+export const CapturingOverlay = () => (
 	<output
 		aria-live="polite"
-		className="absolute inset-0 z-20 grid place-items-center rounded-2xl bg-secondary/65 p-6 text-surface backdrop-blur-sm"
+		className="absolute inset-0 z-20 grid place-items-center bg-secondary/45 p-6 text-surface backdrop-blur-sm"
 	>
-		<div className="absolute inset-3 rounded-xl border-2 border-accent animate-pulse" />
 		<div className="relative flex flex-col items-center gap-3 text-center">
-			<LoaderCircle aria-hidden="true" className="size-8 animate-spin" />
-			<p className="m-0 text-medium font-semibold">Saving your photo…</p>
-			<p className="m-0 text-sm">This can take a moment.</p>
+			<div className="grid size-16 place-items-center rounded-full border-2 border-surface/80 bg-secondary/50 shadow-lg">
+				<LoaderCircle aria-hidden="true" className="size-8 animate-spin" />
+			</div>
+			<p className="m-0 text-medium font-semibold">Saving photo…</p>
+			<p className="m-0 text-sm">Hold camera steady.</p>
 		</div>
 	</output>
 );
@@ -87,50 +93,71 @@ const LiveCameraButtons = ({
 }: LiveCameraButtonsProps) => (
 	<div className="absolute inset-x-0 bottom-3 z-10 flex justify-center px-3">
 		<div className="flex items-center gap-5 rounded-full bg-secondary/85 p-2 text-surface">
-			<button
-				type="button"
-				onClick={onStop}
-				aria-label="Stop camera"
-				title="Stop camera"
-				className="grid size-12 cursor-pointer place-items-center rounded-full hover:bg-surface/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-			>
-				<Square aria-hidden="true" className="size-5" />
-			</button>
-			<button
-				type="button"
-				onClick={onCapture}
-				aria-label="Capture photo"
-				title="Capture photo"
-				className="grid size-16 cursor-pointer place-items-center rounded-full border-4 border-surface bg-surface/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:bg-surface/40"
-			>
-				<span aria-hidden="true" className="size-12 rounded-full bg-surface" />
-			</button>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<button
+						type="button"
+						onClick={onStop}
+						aria-label="Stop camera"
+						className="grid size-12 cursor-pointer place-items-center rounded-full hover:bg-surface/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+					>
+						<Square aria-hidden="true" className="size-5" />
+					</button>
+				</TooltipTrigger>
+				<TooltipContent>Stop camera</TooltipContent>
+			</Tooltip>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<button
+						type="button"
+						onClick={onCapture}
+						aria-label="Capture photo"
+						className="grid size-16 cursor-pointer place-items-center rounded-full border-4 border-surface bg-surface/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:bg-surface/40"
+					>
+						<span
+							aria-hidden="true"
+							className="size-12 rounded-full bg-surface"
+						/>
+					</button>
+				</TooltipTrigger>
+				<TooltipContent>Capture photo</TooltipContent>
+			</Tooltip>
 			{canSwitchCamera && (
-				<button
-					type="button"
-					onClick={onSwitchCamera}
-					aria-label="Switch camera"
-					title="Switch camera"
-					className="grid size-12 cursor-pointer place-items-center rounded-full hover:bg-surface/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-				>
-					<SwitchCamera aria-hidden="true" className="size-5" />
-				</button>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<button
+							type="button"
+							onClick={onSwitchCamera}
+							aria-label="Switch camera"
+							className="grid size-12 cursor-pointer place-items-center rounded-full hover:bg-surface/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+						>
+							<SwitchCamera aria-hidden="true" className="size-5" />
+						</button>
+					</TooltipTrigger>
+					<TooltipContent>Switch camera</TooltipContent>
+				</Tooltip>
 			)}
 			{torchSupported && (
-				<button
-					type="button"
-					onClick={onTorch}
-					aria-pressed={torchEnabled}
-					aria-label={torchEnabled ? "Turn torch off" : "Turn torch on"}
-					title={torchEnabled ? "Turn torch off" : "Turn torch on"}
-					className="grid size-12 cursor-pointer place-items-center rounded-full hover:bg-surface/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-				>
-					{torchEnabled ? (
-						<Zap aria-hidden="true" className="size-5" />
-					) : (
-						<ZapOff aria-hidden="true" className="size-5" />
-					)}
-				</button>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<button
+							type="button"
+							onClick={onTorch}
+							aria-pressed={torchEnabled}
+							aria-label={torchEnabled ? "Turn torch off" : "Turn torch on"}
+							className="grid size-12 cursor-pointer place-items-center rounded-full hover:bg-surface/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+						>
+							{torchEnabled ? (
+								<Zap aria-hidden="true" className="size-5" />
+							) : (
+								<ZapOff aria-hidden="true" className="size-5" />
+							)}
+						</button>
+					</TooltipTrigger>
+					<TooltipContent>
+						{torchEnabled ? "Turn torch off" : "Turn torch on"}
+					</TooltipContent>
+				</Tooltip>
 			)}
 		</div>
 	</div>

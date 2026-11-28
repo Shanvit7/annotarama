@@ -1,5 +1,10 @@
 import { Minus, Plus } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type PhotoZoomControlsProps = {
 	imageWidth: number;
@@ -20,35 +25,47 @@ export const PhotoZoomControls = ({
 		</span>
 		<fieldset className="m-0 inline-flex shrink-0 items-center gap-1 border-0 p-0">
 			<legend className="sr-only">Photo zoom</legend>
-			<button
-				type="button"
-				aria-label="Zoom out"
-				title="Zoom out"
-				disabled={zoom <= 0.25}
-				onClick={() => setZoom((current) => Math.max(0.25, current - 0.25))}
-				className="inline-flex size-10 items-center justify-center rounded-md text-neutral-dark hover:bg-surface-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-			>
-				<Minus aria-hidden="true" className="size-4" />
-			</button>
-			<button
-				type="button"
-				aria-label="Fit photo to view"
-				title="Reset zoom to Fit; percentage is relative to Fit"
-				onClick={() => setZoom(1)}
-				className="min-h-10 rounded-md px-2 text-xs font-medium text-neutral-dark hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-			>
-				{Math.round(zoom * 100)}%
-			</button>
-			<button
-				type="button"
-				aria-label="Zoom in"
-				title="Zoom in"
-				disabled={zoom >= 4}
-				onClick={() => setZoom((current) => Math.min(4, current + 0.25))}
-				className="inline-flex size-10 items-center justify-center rounded-md text-neutral-dark hover:bg-surface-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-			>
-				<Plus aria-hidden="true" className="size-4" />
-			</button>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<button
+						type="button"
+						aria-label="Zoom out"
+						disabled={zoom <= 0.25}
+						onClick={() => setZoom((current) => Math.max(0.25, current - 0.25))}
+						className="inline-flex size-10 items-center justify-center rounded-md text-neutral-dark hover:bg-surface-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+					>
+						<Minus aria-hidden="true" className="size-4" />
+					</button>
+				</TooltipTrigger>
+				<TooltipContent>Zoom out</TooltipContent>
+			</Tooltip>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<button
+						type="button"
+						aria-label="Fit photo to view"
+						onClick={() => setZoom(1)}
+						className="min-h-10 rounded-md px-2 text-xs font-medium text-neutral-dark hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+					>
+						{Math.round(zoom * 100)}%
+					</button>
+				</TooltipTrigger>
+				<TooltipContent>Reset zoom to Fit</TooltipContent>
+			</Tooltip>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<button
+						type="button"
+						aria-label="Zoom in"
+						disabled={zoom >= 4}
+						onClick={() => setZoom((current) => Math.min(4, current + 0.25))}
+						className="inline-flex size-10 items-center justify-center rounded-md text-neutral-dark hover:bg-surface-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+					>
+						<Plus aria-hidden="true" className="size-4" />
+					</button>
+				</TooltipTrigger>
+				<TooltipContent>Zoom in</TooltipContent>
+			</Tooltip>
 		</fieldset>
 	</div>
 );

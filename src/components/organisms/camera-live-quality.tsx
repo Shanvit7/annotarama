@@ -1,4 +1,4 @@
-import { Camera, CircleCheck, TriangleAlert } from "lucide-react";
+import { Camera, CircleCheck, LoaderCircle, TriangleAlert } from "lucide-react";
 import {
 	assessPhoto,
 	type LiveQuality,
@@ -59,7 +59,7 @@ const getStatusPresentation = (quality: LiveQuality) => {
 	if (quality.overall === "good") {
 		return { title: "Good capture conditions", Icon: CircleCheck };
 	}
-	return { title: "Checking conditions…", Icon: Camera };
+	return { title: "Checking conditions", Icon: LoaderCircle };
 };
 
 const QualitySuggestion = ({
@@ -106,13 +106,17 @@ const LiveQualityIndicator = ({
 				<div className="flex items-center gap-2">
 					<StatusIcon
 						aria-hidden="true"
-						className={`size-4 shrink-0 ${quality.unavailable ? "text-surface" : liveTones[quality.overall]}`}
+						className={`size-4 shrink-0 ${quality.overall === "unknown" && !quality.unavailable ? "animate-spin text-surface" : quality.unavailable ? "text-surface" : liveTones[quality.overall]}`}
 					/>
 					<output
 						className="m-0 text-sm font-semibold leading-5 text-surface"
 						aria-live="polite"
 					>
-						{title}
+						{quality.overall === "unknown" && !quality.unavailable ? (
+							<span className="sr-only">{title}…</span>
+						) : (
+							title
+						)}
 					</output>
 				</div>
 				<dl className="grid w-full grid-cols-3 gap-2 text-sm leading-5">
@@ -120,7 +124,14 @@ const LiveQualityIndicator = ({
 						<div key={label} className="min-w-0">
 							<dt className="text-xs text-surface/70">{label}</dt>
 							<dd className={`m-0 font-semibold ${liveTones[status]}`}>
-								{value}
+								{status === "unknown" && !quality.unavailable ? (
+									<span
+										aria-hidden="true"
+										className="my-1 block h-3 w-14 animate-pulse rounded-sm bg-surface/30"
+									/>
+								) : (
+									value
+								)}
 							</dd>
 						</div>
 					))}

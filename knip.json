@@ -2,9 +2,9 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
     "src/react-scan.ts",
-    "scripts/check-annotation-ui.mjs",
-    "scripts/check-ascii-backdrop.mjs",
-    "scripts/check-live-camera.mjs"
+    "scripts/ego-browser/check-annotation-ui.mjs",
+    "scripts/ego-browser/check-ascii-backdrop.mjs",
+    "scripts/ego-browser/check-live-camera.mjs"
   ],
   "ignore": [".agents/**"]
 }
